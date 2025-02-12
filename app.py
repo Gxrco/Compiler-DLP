@@ -24,9 +24,9 @@ def process_regex(regex):
 
 if __name__ == '__main__':
     regex_list = [
-        r"(\W|^)[\w.\-]{0,25}@(yahoo|hotmail|gmail)\.com(\W|$)",
-        r"(a|b)c+",
-        r"ab?c"
+        # r"(\W|^)[\w.\-]{0,25}@(yahoo|hotmail|gmail)\.com(\W|$)",
+         r"(a|b)c+",
+        # r"ab?c"
     ]
     
     for regex in regex_list:
