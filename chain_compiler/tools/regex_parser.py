@@ -1,4 +1,4 @@
-from regex_normalizer.model.token import Token
+from chain_compiler.model.token import Token
 
 def tokenize(regex):
     """

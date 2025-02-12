@@ -1,4 +1,4 @@
-from regex_normalizer.tools.regex_parser import tokenize
+from chain_compiler.tools.regex_parser import tokenize
 
 
 def normalize_regex(regex):
