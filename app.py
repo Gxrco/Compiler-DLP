@@ -2,7 +2,6 @@ from chain_compiler.normalizer import normalize_regex
 from chain_compiler.parser import parse_tokens
 from chain_compiler.ast_service import generate_ast, build_ast_graph
 from afd_compiler.service import AFDService
-from afd_compiler.tools.dfa_optimization import minimize_dfa
 
 def process_regex(regex):
     print("Expresión regular:", regex)
@@ -17,21 +16,22 @@ def process_regex(regex):
     print("AST:")
     print(ast.pretty_print())
     
+    # Construir y visualizar el AST
     ast_graph = build_ast_graph(ast)
     ast_graph.render('ast_graph', view=True)
     
+    # Construir el DFA a partir del AST
     afd_service = AFDService()
     dfa = afd_service.build_dfa_from_ast(ast)
     
     normal_filename = f'dfa_normal_{regex.replace("?", "optional").replace("*", "star").replace("+", "plus").replace("|", "or")}'
     dfa.visualize(normal_filename)
     
-    minimized_dfa = minimize_dfa(dfa)
+    # Minimizar el DFA a través del servicio
+    minimized_dfa = afd_service.minimize_dfa()
     
     minimized_filename = f'dfa_minimized_{regex.replace("?", "optional").replace("*", "star").replace("+", "plus").replace("|", "or")}'
     minimized_dfa.visualize(minimized_filename)
-    
-    afd_service.dfa = minimized_dfa
     
     # Imprimir información del DFA minimizado
     dfa_info = afd_service.get_dfa_info()
@@ -42,6 +42,7 @@ def process_regex(regex):
     print(f"Estados de aceptación: {dfa_info['accepting_states_count']}")
     
     # Probar algunas cadenas con el DFA minimizado
+    # Esto será reemplazado por tests unitarios en el futuro.
     test_strings = ["abb", "aabb", "aaabb", "babb", "abab", "bbaabb", "ab"]
     print("\nProbando cadenas con el AFD minimizado:")
     for s in test_strings:
@@ -51,8 +52,9 @@ def process_regex(regex):
     print("=" * 40)
 
 if __name__ == '__main__':
+    # Únicamente se procesará una lista de expresiones regulares (temporal).
     regex_list = [
-        "(a|b)*abb"
+        "(a|b)*abb(a|b)*"
     ]
     
     for regex in regex_list:
