@@ -1,12 +1,4 @@
 class ASTNode:
-    """
-    Nodo del Árbol de Sintaxis Abstracta (AST) para la expresión regular.
-
-    Atributos:
-        type (str): Tipo del nodo ('CHAR' para literales, 'OPERATOR' para operadores).
-        value (str): Valor del nodo.
-        children (list): Lista de nodos hijos.
-    """
     def __init__(self, node_type, value, children=None):
         self.type = node_type
         self.value = value
