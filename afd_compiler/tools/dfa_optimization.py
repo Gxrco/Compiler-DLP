@@ -1,85 +1,71 @@
 """
 Módulo para la optimización de DFA.
-Implementa el algoritmo de particiones (refinamiento de particiones) para minimizar un DFA,
-y además proporciona una función para graficar el DFA minimizado.
+Implementa el algoritmo de Hopcroft para minimizar un DFA.
 """
 
 from afd_compiler.models.dfa import DFA
 
 def minimize_dfa(dfa: DFA) -> DFA:
-    """
-    Minimiza un DFA utilizando el algoritmo de particiones.
-
-    Args:
-        dfa (DFA): DFA original a minimizar.
-
-    Returns:
-        DFA: DFA minimizado.
-    """
-    accepting = set(dfa.accepting_states)
-    non_accepting = set(dfa.states) - accepting
-
+    Q = set(dfa.states)
+    F = set(dfa.accepting_states)
+    nonF = Q - F
     P = []
-    if accepting:
-        P.append(accepting)
-    if non_accepting:
-        P.append(non_accepting)
-    
-    W = list(P) 
+    if F:
+        P.append(F)
+    if nonF:
+        P.append(nonF)
+
+    W = list(P)
 
     while W:
-        A = W.pop()
-        for symbol in dfa.alphabet:
-            X = { state for state in dfa.states 
-                  if (state, symbol) in dfa.transitions and dfa.transitions[(state, symbol)] in A }
-            
+        A = W.pop(0)  
+        for c in dfa.alphabet:
             new_P = []
             for Y in P:
-                intersection = Y & X
-                difference = Y - X
-                if intersection and difference:
-                    new_P.append(intersection)
-                    new_P.append(difference)
-                    
+                X = { s for s in Y if (s, c) in dfa.transitions and dfa.transitions[(s, c)] in A }
+                if X and X != Y:
+                    new_P.append(X)
+                    new_P.append(Y - X)
+
                     if Y in W:
                         W.remove(Y)
-                        W.append(intersection)
-                        W.append(difference)
+                        W.append(X)
+                        W.append(Y - X)
                     else:
-                        if len(intersection) <= len(difference):
-                            W.append(intersection)
+
+                        if len(X) <= len(Y - X):
+                            W.append(X)
                         else:
-                            W.append(difference)
+                            W.append(Y - X)
                 else:
                     new_P.append(Y)
             P = new_P
 
+    state_mapping = {}
     new_states = set()
-    state_map = {} 
     for block in P:
-        new_state = frozenset(block)
-        new_states.add(new_state)
+        block_frozen = frozenset(block)  
+        new_states.add(block_frozen)
         for s in block:
-            state_map[s] = new_state
+            state_mapping[s] = block_frozen
 
+    
     new_transitions = {}
-    for block in P:
-        new_state = frozenset(block)
-        representative = next(iter(block))
-        for symbol in dfa.alphabet:
-            if (representative, symbol) in dfa.transitions:
-                target = dfa.transitions[(representative, symbol)]
-                new_target = state_map[target]
-                new_transitions[(new_state, symbol)] = new_target
+    for block in new_states: 
+        rep = next(iter(block))
+        for c in dfa.alphabet:
+            if (rep, c) in dfa.transitions:
+                target = dfa.transitions[(rep, c)]
+                new_transitions[(block, c)] = state_mapping[target]
 
-    # Determinar el estado inicial y los de aceptación.
-    new_initial = state_map[dfa.initial_state]
-    new_accepting = { state_map[s] for s in dfa.accepting_states }
+   
+    new_initial = state_mapping[dfa.initial_state]
+    new_accepting = { state_mapping[s] for s in dfa.accepting_states }
 
     return DFA(new_states, dfa.alphabet, new_transitions, new_initial, new_accepting)
 
 
+
 def visualize_minimized_dfa(dfa: DFA, filename: str = 'minimized_dfa'):
-    
-    minimized_dfa = minimize_dfa(dfa)
-    return minimized_dfa.visualize(filename)
+    minimized = minimize_dfa(dfa)
+    return minimized.visualize(filename)
