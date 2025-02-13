@@ -1,5 +1,3 @@
-# afd_compiler/service.py
-
 from afd_compiler.services.dfa_builder import build_direct_dfa 
 
 class AFDService:
