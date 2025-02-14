@@ -33,17 +33,10 @@ def process_regex(regex):
     minimized_filename = f'dfa_minimized_{regex.replace("?", "optional").replace("*", "star").replace("+", "plus").replace("|", "or")}'
     minimized_dfa.visualize(minimized_filename)
     
-    # Imprimir información del DFA minimizado
-    dfa_info = afd_service.get_dfa_info()
-    print("\nInformación del AFD minimizado:")
-    print(f"Número de estados: {dfa_info['states_count']}")
-    print(f"Alfabeto: {dfa_info['alphabet']}")
-    print(f"Número de transiciones: {dfa_info['transitions_count']}")
-    print(f"Estados de aceptación: {dfa_info['accepting_states_count']}")
     
     # Probar algunas cadenas con el DFA minimizado
     # Esto será reemplazado por tests unitarios en el futuro.
-    test_strings = ["abb", "aabb", "aaabb", "babb", "abab", "bbaabb", "ab"]
+    test_strings = [".**.Mama2"]
     print("\nProbando cadenas con el AFD minimizado:")
     for s in test_strings:
         result = afd_service.match(s)
@@ -54,7 +47,7 @@ def process_regex(regex):
 if __name__ == '__main__':
     # Únicamente se procesará una lista de expresiones regulares (temporal).
     regex_list = [
-        "(a|b)*abb(a|b)*"
+        "(\.|\*)+([A-Za-z]*)[0-9]?"
     ]
     
     for regex in regex_list:
