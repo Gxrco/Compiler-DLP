@@ -34,7 +34,7 @@ def process_regex(regex):
     print(f"Estados de aceptación: {dfa_info['accepting_states_count']}")
     
     # Probar algunas cadenas
-    test_strings = ["ac", "acc", "bc", "bcccc", "ab", "a", "b"]
+    test_strings = ["abbbd", "acd", "ad", "ab", "abcd", "abcbcd", "abcbcbcd", "abcbcbcbcd"]
     print("\nProbando cadenas:")
     for s in test_strings:
         result = afd_service.match(s)
@@ -44,9 +44,9 @@ def process_regex(regex):
 
 if __name__ == '__main__':
     regex_list = [
-        # "a(b|c)*d",
+        "a(b|c)*d",
         # "(a|b)c+",
-        "(\.|\*)+([A-Za-z])[0-9]"
+        # "(\.|\*)+([A-Za-z]*)[0-9]"
     ]
     
     for regex in regex_list:
