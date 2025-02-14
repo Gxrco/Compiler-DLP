@@ -1,10 +1,9 @@
-# afd_compiler/service.py
-
 from afd_compiler.services.dfa_builder import build_direct_dfa 
+from afd_compiler.tools.dfa_optimization import minimize_dfa
 
 class AFDService:
     """
-    Servicio que encapsula el proceso de construcción y uso del AFD.
+    Servicio que encapsula el proceso de construcción, optimización y uso del AFD.
     """
     def __init__(self):
         self.dfa = None
@@ -14,6 +13,15 @@ class AFDService:
         Construye un AFD a partir de un AST.
         """
         self.dfa = build_direct_dfa(ast)
+        return self.dfa
+
+    def minimize_dfa(self):
+        """
+        Minimiza el DFA previamente construido y actualiza el atributo dfa.
+        """
+        if self.dfa is None:
+            raise ValueError("DFA no ha sido construido")
+        self.dfa = minimize_dfa(self.dfa)
         return self.dfa
     
     def match(self, string):
