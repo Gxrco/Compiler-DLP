@@ -12,6 +12,17 @@ def tokenize(regex):
     def can_concat_current(token_type):
         return token_type in ['CHAR', 'CHAR_CLASS', 'LPAREN']
 
+    special_chars = {
+        '*': 'OPERATOR',
+        '+': 'OPERATOR',
+        '?': 'OPERATOR',
+        '|': 'OPERATOR',
+        '(': 'LPAREN',
+        ')': 'RPAREN',
+        '[': 'CHAR_CLASS_START',
+        ']': 'CHAR_CLASS_END'
+    }
+
     while i < len(regex):
         char = regex[i]
         token = None
@@ -21,41 +32,31 @@ def tokenize(regex):
             if i >= len(regex):
                 raise ValueError("Escape incompleto al final de la expresión")
             escaped_char = regex[i]
-            token = Token('CHAR', '\\' + escaped_char)
+            token = Token('CHAR', escaped_char)
         elif char == '[':
             j = i + 1
             char_class = '['
             while j < len(regex) and regex[j] != ']':
-                char_class += regex[j]
-                j += 1
+                if regex[j] == '\\' and j + 1 < len(regex):
+                    char_class += regex[j:j+2]
+                    j += 2
+                else:
+                    char_class += regex[j]
+                    j += 1
             if j >= len(regex) or regex[j] != ']':
                 raise ValueError("Clase de caracteres no terminada")
             char_class += ']'
             token = Token('CHAR_CLASS', char_class)
-            i = j  
-        elif char == '{':
-            j = i + 1
-            quant = '{'
-            while j < len(regex) and regex[j] != '}':
-                quant += regex[j]
-                j += 1
-            if j >= len(regex) or regex[j] != '}':
-                raise ValueError("Cuantificador no terminado")
-            quant += '}'
-            token = Token('QUANTIFIER', quant)
             i = j
-        elif char == '(':
-            token = Token('LPAREN', char)
-        elif char == ')':
-            token = Token('RPAREN', char)
-        elif char in ['|', '*', '+', '?']:
-            token = Token('OPERATOR', char)
+        elif char in special_chars:
+            token = Token(special_chars[char], char)
         else:
             token = Token('CHAR', char)
         
         if previous_token is not None:
             if can_concat_prev(previous_token) and can_concat_current(token.type):
                 tokens.append(Token('OPERATOR', '&'))
+        
         tokens.append(token)
         previous_token = token
         i += 1
