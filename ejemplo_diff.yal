@@ -1,0 +1,2 @@
+let VOWEL = [aeiou]
+[a-z]#[aeiou]+ { return "CONS"; }

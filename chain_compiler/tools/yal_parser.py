@@ -14,22 +14,22 @@ def parse_yal_file(filepath):
     i = 0
     if lines and lines[0].strip() == "{":
         i += 1
-        header_lines = []
+        header = []
         while i < len(lines) and lines[i].strip() != "}":
-            header_lines.append(lines[i])
+            header.append(lines[i])
             i += 1
-        result["header"] = "\n".join(header_lines).strip()
+        result["header"] = "\n".join(header).strip()
         i += 1
 
     # --- Extraer TRAILER ---
     j = len(lines) - 1
     if lines and lines[j].strip() == "}":
         j -= 1
-        trailer_lines = []
+        trailer = []
         while j >= 0 and lines[j].strip() != "{":
-            trailer_lines.append(lines[j])
+            trailer.append(lines[j])
             j -= 1
-        result["trailer"] = "\n".join(reversed(trailer_lines)).strip()
+        result["trailer"] = "\n".join(reversed(trailer)).strip()
 
     # --- Procesar DEFINICIONES y REGLAS entre header y trailer ---
     body = lines[i : j+1]
@@ -47,14 +47,12 @@ def parse_yal_file(filepath):
             if m:
                 raw_rules.append((m.group(1).strip(), m.group(2).strip()))
 
-    # Expandir definiciones
-    def expand(regex):
+    def expand_defs(regex):
         if not result["definitions"]:
             return regex
 
-        names = '|'.join(re.escape(k) for k in result["definitions"].keys())
+        names = '|'.join(re.escape(k) for k in result["definitions"])
         pattern = re.compile(r'(?:\{(' + names + r')\}|\b(' + names + r')\b)')
-
         while True:
             replaced = pattern.sub(lambda m: f'({result["definitions"][m.group(1) or m.group(2)]})', regex)
             if replaced == regex:
@@ -62,7 +60,38 @@ def parse_yal_file(filepath):
             regex = replaced
         return regex
 
+    def expand_difference(regex):
+        pattern = re.compile(r'(\[[^\]]+\])\s*#\s*(\[[^\]]+\])')
+        while True:
+            m = pattern.search(regex)
+            if not m:
+                break
+
+            def class_to_set(cls):
+                content = cls[1:-1]
+                s = set()
+                i = 0
+                while i < len(content):
+                    if i+2 < len(content) and content[i+1] == '-':
+                        for c in range(ord(content[i]), ord(content[i+2]) + 1):
+                            s.add(chr(c))
+                        i += 3
+                    else:
+                        s.add(content[i])
+                        i += 1
+                return s
+
+            left = class_to_set(m.group(1))
+            right = class_to_set(m.group(2))
+            diff = sorted(left - right)
+            replacement = "(" + "|".join(diff) + ")"
+            regex = regex[:m.start()] + replacement + regex[m.end():]
+
+        return regex
+
     for regex, action in raw_rules:
-        result["rules"].append((expand(regex), action))
+        expanded = expand_defs(regex)
+        expanded = expand_difference(expanded)
+        result["rules"].append((expanded, action))
 
     return result
