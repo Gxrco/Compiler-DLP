@@ -48,3 +48,7 @@ if __name__ == '__main__':
     # Únicamente se procesará una lista de expresiones regulares (temporal).
     regex_list = [
         "(\.|\*)+([A-Za-z]*)[0-9]?"
+    ]
+    
+    for regex in regex_list:
+        process_regex(regex)
