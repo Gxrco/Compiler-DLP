@@ -2,6 +2,8 @@ from chain_compiler.normalizer import normalize_regex
 from chain_compiler.parser import parse_tokens
 from chain_compiler.ast_service import generate_ast, build_ast_graph
 from afd_compiler.service import AFDService
+from file_processor import read_regex_from_file
+import argparse
 
 def process_regex(regex):
     print("Expresión regular:", regex)
@@ -36,7 +38,7 @@ def process_regex(regex):
     
     # Probar algunas cadenas con el DFA minimizado
     # Esto será reemplazado por tests unitarios en el futuro.
-    test_strings = [".**.Mama2"]
+    test_strings = [".**.Mama"]
     print("\nProbando cadenas con el AFD minimizado:")
     for s in test_strings:
         result = afd_service.match(s)
@@ -45,10 +47,39 @@ def process_regex(regex):
     print("=" * 40)
 
 if __name__ == '__main__':
-    # Únicamente se procesará una lista de expresiones regulares (temporal).
-    regex_list = [
-        "(\.|\*)+([A-Za-z]*)[0-9]?"
-    ]
+    # Set up argument parser for command line options
+    parser = argparse.ArgumentParser(description='Process regular expressions directly or from a file.')
+    parser.add_argument('--file', '-f', help='Path to file containing regex patterns')
+    parser.add_argument('--regex', '-r', help='Direct regex pattern input')
+    parser.add_argument('--concat', '-c', action='store_true', 
+                        help='Concatenate all regex patterns into a single regex')
+    args = parser.parse_args()
     
-    for regex in regex_list:
-        process_regex(regex)
+    regex_list = []
+    
+    # Process file input if provided
+    if args.file:
+        regex_list = read_regex_from_file(args.file)
+        if not regex_list:
+            print("No valid regex patterns found in file. Using default patterns.")
+    
+    # Process direct regex input if provided
+    if args.regex:
+        regex_list.append(args.regex)
+    
+    # Use default regex if no input was provided or if file was empty
+    if not regex_list:
+        regex_list = [
+            "[a-zA-Z_]"
+        ]
+    
+    # Handle concatenation if requested
+    if args.concat and len(regex_list) > 1:
+        # Simple concatenation of all regex patterns
+        concatenated_regex = ''.join(regex_list)
+        print(f"Concatenated regex: {concatenated_regex}")
+        process_regex(concatenated_regex)
+    else:
+        # Process each regex separately
+        for regex in regex_list:
+            process_regex(regex)
