@@ -1,0 +1,17 @@
+{
+# Header: se incluirá en el archivo generado
+def token(t): return t
+}
+
+let DIGIT = [0-9]
+let LETTER = [a-zA-Z]
+let ID = {LETTER}({LETTER}|{DIGIT})*
+
+{DIGIT}+ { return "ENTERO"; }
+{ID} { return "IDENTIFICADOR"; }
+"+" { return "MAS"; }
+
+{
+# Trailer: código adicional
+print("Lexer terminado.")
+}
