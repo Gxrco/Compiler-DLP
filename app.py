@@ -4,6 +4,8 @@ from chain_compiler.ast_service import generate_ast, build_ast_graph
 from afd_compiler.service import AFDService
 from file_processor import read_regex_from_file
 import argparse
+from chain_compiler.tools.yal_parser import parse_yal_file
+
 
 def process_regex(regex):
     print("Expresión regular:", regex)
@@ -49,6 +51,7 @@ def process_regex(regex):
 if __name__ == '__main__':
     # Set up argument parser for command line options
     parser = argparse.ArgumentParser(description='Process regular expressions directly or from a file.')
+    parser.add_argument('--yal', help='Ruta a un archivo .yal')
     parser.add_argument('--file', '-f', help='Path to file containing regex patterns')
     parser.add_argument('--regex', '-r', help='Direct regex pattern input')
     parser.add_argument('--concat', '-c', action='store_true', 
@@ -57,6 +60,28 @@ if __name__ == '__main__':
     
     regex_list = []
     
+    if args.yal:
+        yal_info = parse_yal_file(args.yal)
+    if not yal_info:
+        exit(1)
+    
+    print("Sección HEADER:")
+    print(yal_info['header'])
+    
+    print("\nDefiniciones:")
+    for d in yal_info['definitions']:
+        print(" -", d)
+    
+    print("\nReglas:")
+    for regex, action in yal_info['rules']:
+        print(f" - {regex} => {{ {action} }}")
+
+    print("\nSección TRAILER:")
+    print(yal_info['trailer'])
+    
+    exit(0)
+
+
     # Process file input if provided
     if args.file:
         regex_list = read_regex_from_file(args.file)

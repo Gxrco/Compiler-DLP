@@ -1,3 +1,4 @@
+from chain_compiler.tools.yal_parser import parse_yal_file
 
 def read_regex_from_file(file_path):
     """
