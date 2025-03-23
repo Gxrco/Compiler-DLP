@@ -1,48 +1,50 @@
 import copy
 from chain_compiler.model.ast_node import ASTNode
 from chain_compiler.model.operator import OPERATORS
+from string import printable
 
 def expand_char_class(token):
     """
-    Expande un token de tipo CHAR_CLASS en un AST que representa la unión (|) de
-    todos los caracteres de la clase. Por ejemplo, "[A-Za-z]" se transforma en:
-       (A|B|...|Z|a|b|...|z)
-    
+    Expande una clase de caracteres en un AST de unión.
+    Soporta clases normales y clases negadas ([^...]).
+
     Args:
-        token (Token): Token de tipo CHAR_CLASS (con valor, por ejemplo, "[A-Za-z]")
-    
+        token (Token): Token con valor "[a-z]" o "[^abc]"
+
     Returns:
-        ASTNode: AST que representa la unión de cada carácter en la clase.
-    
-    Raises:
-        NotImplementedError: Si la clase es negada (comienza con '^').
-        ValueError: Si la clase está vacía.
+        ASTNode: AST que representa la unión (|) de todos los caracteres permitidos
     """
-    # Se remueven los corchetes
     content = token.value[1:-1]
-    if content and content[0] == '^':
-        raise NotImplementedError("Clases negadas no implementadas")
-    
-    char_list = []
+    is_negated = content.startswith('^')
+    if is_negated:
+        content = content[1:]
+
+    char_set = set()
     i = 0
     while i < len(content):
         if i + 2 < len(content) and content[i+1] == '-':
             start = content[i]
             end = content[i+2]
-            for code in range(ord(start), ord(end)+1):
-                char_list.append(chr(code))
+            for c in range(ord(start), ord(end)+1):
+                char_set.add(chr(c))
             i += 3
         else:
-            char_list.append(content[i])
+            char_set.add(content[i])
             i += 1
-    if not char_list:
+
+    if not char_set:
         raise ValueError("Clase de caracteres vacía")
-    
-    # Se crea el AST de unión: (char1 | char2 | ... | charN)
-    union_ast = ASTNode('CHAR', char_list[0])
-    for ch in char_list[1:]:
-        new_node = ASTNode('CHAR', ch)
-        union_ast = ASTNode('OPERATOR', '|', [union_ast, new_node])
+
+    if is_negated:
+        all_chars = set(printable) 
+        char_set = all_chars - char_set
+
+    # Convertimos el set final a AST de unión
+    sorted_chars = sorted(char_set)
+    union_ast = ASTNode('CHAR', sorted_chars[0])
+    for ch in sorted_chars[1:]:
+        union_ast = ASTNode('OPERATOR', '|', [union_ast, ASTNode('CHAR', ch)])
+
     return union_ast
 
 def build_ast(postfix_tokens):

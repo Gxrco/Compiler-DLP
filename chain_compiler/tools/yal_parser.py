@@ -1,73 +1,68 @@
 import re
 
 def parse_yal_file(filepath):
-    """
-    Parsea un archivo .yal y separa las secciones:
-    - header: bloque entre llaves { ... }
-    - definitions: let NAME = regex
-    - rules: regex { acción }
-    - trailer: bloque entre llaves { ... }
-
-    Retorna un diccionario con:
-    - header: str
-    - definitions: dict
-    - rules: list de tuplas (regex, acción)
-    - trailer: str
-    """
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
+            lines = f.read().splitlines()
     except FileNotFoundError:
         print(f"Archivo no encontrado: {filepath}")
         return None
 
-    result = {
-        "header": "",
-        "definitions": {},
-        "rules": [],
-        "trailer": ""
-    }
+    result = {"header": "", "definitions": {}, "rules": [], "trailer": ""}
 
-    # Extraer bloques entre llaves { ... }
-    blocks = re.findall(r'\{([^}]*)\}', content, re.DOTALL)
-    remaining = re.sub(r'\{[^}]*\}', '', content, count=2, flags=re.DOTALL).strip()
+    # --- Extraer HEADER ---
+    i = 0
+    if lines and lines[0].strip() == "{":
+        i += 1
+        header_lines = []
+        while i < len(lines) and lines[i].strip() != "}":
+            header_lines.append(lines[i])
+            i += 1
+        result["header"] = "\n".join(header_lines).strip()
+        i += 1
 
-    if len(blocks) >= 1:
-        result["header"] = blocks[0].strip()
-    if len(blocks) >= 2:
-        result["trailer"] = blocks[-1].strip()
+    # --- Extraer TRAILER ---
+    j = len(lines) - 1
+    if lines and lines[j].strip() == "}":
+        j -= 1
+        trailer_lines = []
+        while j >= 0 and lines[j].strip() != "{":
+            trailer_lines.append(lines[j])
+            j -= 1
+        result["trailer"] = "\n".join(reversed(trailer_lines)).strip()
 
-    # Procesar líneas restantes (definiciones y reglas)
+    # --- Procesar DEFINICIONES y REGLAS entre header y trailer ---
+    body = lines[i : j+1]
     raw_rules = []
-    for line in remaining.splitlines():
+    for line in body:
         line = line.strip()
-        if not line or line.startswith('(*') or line.startswith('//'):
+        if not line or line.startswith("(*") or line.startswith("//"):
             continue
         if line.startswith("let"):
-            # let ID = regex
-            match = re.match(r"let\s+(\w+)\s*=\s*(.+)", line)
-            if match:
-                name, expr = match.group(1), match.group(2)
-                result["definitions"][name] = expr.strip()
+            m = re.match(r"let\s+(\w+)\s*=\s*(.+)", line)
+            if m:
+                result["definitions"][m.group(1)] = m.group(2).strip()
         else:
-            match = re.match(r'(.+?)\s*\{(.*)\}', line)
-            if match:
-                regex = match.group(1).strip()
-                action = match.group(2).strip()
-                raw_rules.append((regex, action))
+            m = re.match(r'^(.*?)\s*\{(.*)\}$', line)
+            if m:
+                raw_rules.append((m.group(1).strip(), m.group(2).strip()))
 
-    # Expandir definiciones en las reglas
-    def expand_definitions(regex, definitions):
-        pattern = re.compile(r'\{(' + '|'.join(re.escape(k) for k in definitions.keys()) + r')\}')
+    # Expandir definiciones
+    def expand(regex):
+        if not result["definitions"]:
+            return regex
+
+        names = '|'.join(re.escape(k) for k in result["definitions"].keys())
+        pattern = re.compile(r'(?:\{(' + names + r')\}|\b(' + names + r')\b)')
+
         while True:
-            replaced = pattern.sub(lambda m: f'({definitions[m.group(1)]})', regex)
+            replaced = pattern.sub(lambda m: f'({result["definitions"][m.group(1) or m.group(2)]})', regex)
             if replaced == regex:
                 break
             regex = replaced
         return regex
 
     for regex, action in raw_rules:
-        expanded_regex = expand_definitions(regex, result["definitions"])
-        result["rules"].append((expanded_regex, action))
+        result["rules"].append((expand(regex), action))
 
     return result
