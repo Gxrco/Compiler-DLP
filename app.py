@@ -6,6 +6,8 @@ from file_processor import read_regex_from_file
 import argparse
 from chain_compiler.tools.yal_parser import parse_yal_file
 import re
+from chain_compiler.tools.super_regex_builder import build_super_regex
+
 
 def process_regex(regex):
     print("Expresión regular:", regex)
@@ -67,13 +69,7 @@ if args.yal:
     if not yal_info:
         exit(1)
 
-    # Construir super‑regex: (regex)#TOKEN | (regex)#TOKEN | …
-    parts = []
-    for regex, action in yal_info['rules']:
-        # extraemos nombre de token desde la acción: return "TOKEN";
-        token = action.split('"')[1]
-        parts.append(f"({regex})#{token}")
-    super_regex = "|".join(parts)
+    super_regex = build_super_regex(yal_info['rules'])
 
     print("Super‑regex combinado:", super_regex)
     process_regex(super_regex)
