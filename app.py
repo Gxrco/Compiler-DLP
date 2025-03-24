@@ -5,7 +5,7 @@ from afd_compiler.service import AFDService
 from file_processor import read_regex_from_file
 import argparse
 from chain_compiler.tools.yal_parser import parse_yal_file
-
+import re
 
 def process_regex(regex):
     print("Expresión regular:", regex)
@@ -29,12 +29,14 @@ def process_regex(regex):
     dfa = afd_service.build_dfa_from_ast(ast)
     
     normal_filename = f'dfa_normal_{regex.replace("?", "optional").replace("*", "star").replace("+", "plus").replace("|", "or")}'
+    normal_filename = re.sub(r'[^\w\-_]', '', normal_filename)
     dfa.visualize(normal_filename)
     
     # Minimizar el DFA a través del servicio
     minimized_dfa = afd_service.minimize_dfa()
     
     minimized_filename = f'dfa_minimized_{regex.replace("?", "optional").replace("*", "star").replace("+", "plus").replace("|", "or")}'
+    minimized_filename = re.sub(r'[^\w\-_]', '', minimized_filename)
     minimized_dfa.visualize(minimized_filename)
     
     
@@ -60,25 +62,21 @@ if __name__ == '__main__':
     
     regex_list = []
     
-    if args.yal:
-        yal_info = parse_yal_file(args.yal)
+if args.yal:
+    yal_info = parse_yal_file(args.yal)
     if not yal_info:
         exit(1)
-    
-    print("Sección HEADER:")
-    print(yal_info['header'])
-    
-    print("\nDefiniciones:")
-    for d in yal_info['definitions']:
-        print(" -", d)
-    
-    print("\nReglas:")
-    for regex, action in yal_info['rules']:
-        print(f" - {regex} => {{ {action} }}")
 
-    print("\nSección TRAILER:")
-    print(yal_info['trailer'])
-    
+    # Construir super‑regex: (regex)#TOKEN | (regex)#TOKEN | …
+    parts = []
+    for regex, action in yal_info['rules']:
+        # extraemos nombre de token desde la acción: return "TOKEN";
+        token = action.split('"')[1]
+        parts.append(f"({regex})#{token}")
+    super_regex = "|".join(parts)
+
+    print("Super‑regex combinado:", super_regex)
+    process_regex(super_regex)
     exit(0)
 
 

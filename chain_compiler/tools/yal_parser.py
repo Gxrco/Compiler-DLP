@@ -50,8 +50,8 @@ def parse_yal_file(filepath):
     def expand_defs(regex):
         if not result["definitions"]:
             return regex
-
         names = '|'.join(re.escape(k) for k in result["definitions"])
+        # Captura tanto {NAME} como NAME (como palabra completa)
         pattern = re.compile(r'(?:\{(' + names + r')\}|\b(' + names + r')\b)')
         while True:
             replaced = pattern.sub(lambda m: f'({result["definitions"][m.group(1) or m.group(2)]})', regex)
@@ -86,11 +86,12 @@ def parse_yal_file(filepath):
             diff = sorted(left - right)
             replacement = "(" + "|".join(diff) + ")"
             regex = regex[:m.start()] + replacement + regex[m.end():]
-
         return regex
+
 
     for regex, action in raw_rules:
         expanded = expand_defs(regex)
+        expanded = re.sub(r'\[\((.*?)\)\]', r'[\1]', expanded)
         expanded = expand_difference(expanded)
         result["rules"].append((expanded, action))
 
