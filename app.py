@@ -10,39 +10,32 @@ from chain_compiler.tools.super_regex_builder import build_super_regex
 
 def scan_input_file(filepath, yal_rules):
     patterns = []
-    for regex, tok in yal_rules:
+    for regex, tok, func in yal_rules:
+        pat_text = regex.strip()
         try:
-            pat = re.compile(rf'^{regex.strip()}')
+            patterns.append((re.compile(rf'^{pat_text}'), tok, func))
         except re.error:
-            pat = re.compile(rf'^{re.escape(regex.strip())}')
-        patterns.append((pat, tok))
-
-    symbol_table = []
+            patterns.append((re.compile(rf'^{re.escape(pat_text)}'), tok, func))
+    table = []
     with open(filepath, encoding='utf-8') as f:
-        for lineno, line in enumerate(f, 1):
+        for lineno, line in enumerate(f,1):
             pos = 0
             while pos < len(line):
                 best = None
-                for pat, tok in patterns:
+                for pat, tok, func in patterns:
                     m = pat.match(line[pos:])
                     if m and (not best or len(m.group(0)) > len(best[0])):
-                        best = (m.group(0), tok)
+                        best = (m.group(0), tok, func)
                 if best:
-                    lex, token = best
-                    if token not in ("lexbuf", "EOL"):
-                        symbol_table.append((lineno, token, lex))
+                    lex, tok, func = best
+                    value = func(lex)
+                    table.append({"line":lineno, "token":tok, "lexeme":lex, "value":value})
                     pos += len(lex)
                 else:
                     pos += 1
-
-    # Imprimir tabla formateada
     print("\nTabla de símbolos:")
-    header = ("Line", "Token", "Lexeme")
-    widths = [max(len(str(r[i])) for r in ([header] + symbol_table)) for i in range(3)]
-    print(f"{header[0]:<{widths[0]}}  {header[1]:<{widths[1]}}  {header[2]:<{widths[2]}}")
-    print("-" * (sum(widths) + 4))
-    for line, token, lex in symbol_table:
-        print(f"{line:<{widths[0]}}  {token:<{widths[1]}}  {lex:<{widths[2]}}")
+    for entry in table:
+        print(entry)
 
         
 
@@ -104,59 +97,64 @@ def process_regex(super_regex, test_strings=None):
     
     return afd_service
 
+
+def make_action(action):
+    action = action.strip()
+
+    # Caso especial: devolver el propio lexema
+    if re.match(r'return\s+lexbuf', action):
+        return lambda lxm: lxm
+
+    # Extraer lo que sigue a return
+    m = re.search(r'return\s+(.+?);?$', action)
+    if m:
+        expr = m.group(1).strip()
+
+        # Si es un identificador simple (token name), devuélvelo como string
+        if re.fullmatch(r'[A-Za-z_]\w*', expr):
+            return lambda lxm, t=expr: t
+
+        # De lo contrario, compile como expresión Python (e.g. int(lxm))
+        code = compile(f"lambda lxm: {expr}", "<action>", "eval")
+        return eval(code)
+
+    # Raise EOF
+    if "raise" in action:
+        return lambda lxm: (_ for _ in ()).throw(Exception("EOF"))
+
+    return lambda lxm: None
+
+
+
 def process_yal_file(path, scan_file=None, test_strings=None):
-    """
-    Procesa un archivo .yal y opcionalmente escanea un archivo de entrada.
-    
-    Args:
-        path (str): Ruta al archivo .yal
-        scan_file (str): Ruta opcional al archivo a escanear
-        test_strings (list): Lista opcional de cadenas para probar
-    """
     info = parse_yal_file(path)
-    if not info:
-        print("Error al parsear el archivo .yal")
-        return
-    
-    print("Header:\n", info.get("header", ""))
-    print("Rule:", info.get("rule", ""))
-    print("Alternativas:")
-    for r, a in info.get("alternatives", []): 
-        print(f"  {r} => {a}")
-    print("Trailer:\n", info.get("trailer", ""))
-    
-    # Extraer los tokens de las acciones
     yal_rules = []
-    for regex, action in info.get("alternatives", []):
-        # Extraer token: primero busca return "TOKEN" o return 'TOKEN'
+    for regex, action in info["alternatives"]:
+        # Primero busca return "TOKEN" o return 'TOKEN'
         m = re.search(r'return\s+[\'"]([^\'"]+)[\'"]', action)
         if m:
             token = m.group(1)
-        elif "return" in action:
-            # Si no hay comillas, toma la función (int, etc.) como token
-            m = re.search(r'return\s*([A-Za-z_]\w*)', action)
-            token = m.group(1).upper() if m else "UNKNOWN"
-        elif "raise" in action:
-            token = "EOF"
         else:
-            token = "UNKNOWN"
-        
-        # Limpiar el patrón — quitar comillas internas, mantener clases intactas
+            # Si no hay comillas, capturar palabra tras return
+            m2 = re.search(r'return\s+([A-Za-z_]\w*)', action)
+            if m2:
+                token = m2.group(1)
+            elif "raise" in action:
+                token = "EOF"
+            else:
+                token = "UNKNOWN"
+
+        func = make_action(action)
         clean = regex.strip().replace("'", "").replace('"', "")
-        yal_rules.append((clean, token))
-    
-    # Construir el super-regex
-    super_regex = build_super_regex(info.get("alternatives", []))
-    print("\nSuper-regex construido:", super_regex)
-    
-    # Procesar el super-regex y generar visualizaciones
-    afd_service = process_regex(super_regex, test_strings)
-    
-    # Escanear archivo de entrada si se proporciona
+        yal_rules.append((clean, token, func))
+        
+    super_regex = build_super_regex(info["alternatives"])
+    afd = process_regex(super_regex)
     if scan_file:
         scan_input_file(scan_file, yal_rules)
-    
-    return afd_service
+    return afd
+
+
 
 if __name__ == '__main__':
     # Configurar el parser de argumentos
