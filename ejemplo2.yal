@@ -5,7 +5,7 @@ def token(t): return t
 
 let VOWEL = [aeiou]
 
-[a-z]#[VOWEL]+ { return "CONS"; }
+[a-z]#{VOWEL}+ { return "CONS"; }
 [aeiou]+       { return "VOC"; }
 [0-9]+         { return "NUM"; }
 "="            { return "IGUAL"; }

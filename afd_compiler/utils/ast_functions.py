@@ -8,7 +8,7 @@ def traverse_tree(node):
 
 def calculate_node_functions(node):
     """Calcula nullable, firstpos y lastpos para cada nodo del árbol."""
-    if node.type == 'CHAR':
+    if node.type == 'CHAR' or node.type == 'CHAR_CLASS':
         pos = Position(node.value)
         node.nullable = False
         node.firstpos = {pos}
@@ -73,13 +73,38 @@ def calculate_followpos(node, followpos=None):
     
     return followpos
 
+def expand_char_class(class_str):
+    """
+    Expande una clase de caracteres del formato [a-z] o similar en un conjunto de caracteres.
+    Soporta rangos y caracteres individuales.
+    """
+    content = class_str[1:-1]  # Remueve los corchetes
+    chars = set()
+    i = 0
+    while i < len(content):
+        if i + 2 < len(content) and content[i+1] == '-':
+            start = content[i]
+            end = content[i+2]
+            for c in range(ord(start), ord(end) + 1):
+                chars.add(chr(c))
+            i += 3
+        else:
+            chars.add(content[i])
+            i += 1
+    return chars
+
 def get_alphabet(node, alphabet=None):
-    """Obtiene el alfabeto de la expresión regular."""
+    """
+    Obtiene el alfabeto de la expresión regular, incluyendo nodos de tipo CHAR y CHAR_CLASS.
+    """
     if alphabet is None:
         alphabet = set()
     
     if node.type == 'CHAR' and node.value != '#':
         alphabet.add(node.value)
+    elif node.type == 'CHAR_CLASS':
+        expanded = expand_char_class(node.value)
+        alphabet.update(expanded)
     
     for child in node.children:
         get_alphabet(child, alphabet)

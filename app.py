@@ -8,15 +8,34 @@ from chain_compiler.tools.yal_parser import parse_yal_file
 import re
 from chain_compiler.tools.super_regex_builder import build_super_regex
 
-
-def process_regex(regex, test_strings=None):
+def scan_input_file(filepath, afd_service):
     """
-    Procesa una expresión regular, construye el AST, el DFA y lo prueba con cadenas de prueba.
+    Lee un archivo de entrada y utiliza el método scan_input del AFD para extraer tokens.
+    Construye y muestra la tabla de símbolos (tokens válidos).
     
     Args:
-        regex (str): La expresión regular a procesar
-        test_strings (list): Lista opcional de cadenas para probar
+        filepath (str): Ruta al archivo de entrada.
+        afd_service (AFDService): Instancia del servicio AFD ya construido.
     """
+    symbol_table = []
+    with open(filepath, 'r', encoding='utf-8') as f:
+        for line_number, line in enumerate(f, start=1):
+            line = line.rstrip('\n')
+            tokens = afd_service.scan_input(line)
+            print(f"Línea {line_number}: {tokens}")
+            for token_type, lexeme in tokens:
+                # Agregar a la tabla solo tokens válidos; se ignoran los errores o tokens a omitir.
+                if token_type not in ["ERROR", "SPACE"]:
+                    symbol_table.append({
+                        "line": line_number,
+                        "token": token_type,
+                        "lexeme": lexeme
+                    })
+    print("\nTabla de símbolos:")
+    for entry in symbol_table:
+        print(entry)
+
+def process_regex(regex, test_strings=None):
     print("Expresión regular:", regex)
     
     # Tokenizar la regex
@@ -29,73 +48,81 @@ def process_regex(regex, test_strings=None):
     
     # Generar el AST
     ast = generate_ast(postfix)
-    print("AST:")
-    print(ast.pretty_print())
+    #print("AST:")
+    #print(ast.pretty_print())
     
     # Construir y visualizar el AST
     ast_graph = build_ast_graph(ast)
     ast_graph.render('ast_graph', view=False)
     
-    # Construir el DFA a partir del AST
+    # Construir el DFA a partir del AST, indicándole que ya contiene marcadores
     afd_service = AFDService()
-    dfa = afd_service.build_dfa_from_ast(ast)
+    dfa = afd_service.build_dfa_from_ast(ast, already_marked=True)
     
-    # Generar un nombre de archivo único para el DFA normal
     safe_regex = regex.replace("?", "optional").replace("*", "star").replace("+", "plus").replace("|", "or")
     safe_regex = re.sub(r'[^\w\-_]', '', safe_regex)
     normal_filename = f'dfa_normal_{safe_regex[:30]}'
     dfa.visualize(normal_filename)
     
-    # Minimizar el DFA
     minimized_dfa = afd_service.minimize_dfa()
-    
-    # Generar un nombre de archivo único para el DFA minimizado
     minimized_filename = f'dfa_minimized_{safe_regex[:30]}'
     minimized_dfa.visualize(minimized_filename)
     
-    # Probar cadenas con el DFA minimizado
     if test_strings is None:
-        test_strings = ["bcdfghjklmnpqrstvwxyz"]  # Cadenas de prueba predeterminadas
+        test_strings = ["bcdfghjklmnpqrstvwxyz"]
     
     print("\nProbando cadenas con el AFD minimizado:")
     for s in test_strings:
         result = afd_service.match(s)
         status = 'Aceptada' if result else 'Rechazada'
-        token = f" (Token: {result})" if result else ""
-        print(f"'{s}': {status}{token}")
+        token_str = f" (Token: {result})" if result else ""
+        print(f"'{s}': {status}{token_str}")
     
     print("=" * 40)
     return afd_service
 
+
 def process_yal_file(filepath, test_strings=None):
     """
-    Procesa un archivo .yal, extrae las reglas y construye el super-regex.
+    Procesa un archivo .yal, extrae los bloques de header, la regla principal y las alternativas,
+    y construye el super-regex.
     
     Args:
-        filepath (str): Ruta al archivo .yal
-        test_strings (list): Lista opcional de cadenas para probar
+        filepath (str): Ruta al archivo .yal.
+        test_strings (list): Lista opcional de cadenas para probar.
     """
     print(f"Procesando archivo YAL: {filepath}")
     
-    # Parsear el archivo .yal
+    # Parsear el archivo .yal usando el nuevo parser
     yal_info = parse_yal_file(filepath)
     if not yal_info:
         print("Error al parsear el archivo .yal")
         return
     
-    print("Definiciones encontradas:")
-    for name, definition in yal_info['definitions'].items():
-        print(f"  {name} = {definition}")
+    # Mostrar el header
+    if yal_info.get("header"):
+        print("Header:")
+        print(yal_info["header"])
     
-    print("\nReglas encontradas:")
-    for regex, action in yal_info['rules']:
+    # Mostrar la regla principal
+    if yal_info.get("rule"):
+        print("Regla principal encontrada:", yal_info["rule"])
+    
+    # Mostrar las alternativas encontradas
+    print("\nAlternativas encontradas:")
+    for regex, action in yal_info.get("alternatives", []):
         print(f"  {regex} => {action}")
     
-    # Construir el super-regex
-    super_regex = build_super_regex(yal_info['rules'])
+    # Mostrar el trailer si existe
+    if yal_info.get("trailer"):
+        print("\nTrailer:")
+        print(yal_info["trailer"])
+    
+    # Construir el super-regex a partir de las alternativas
+    super_regex = build_super_regex(yal_info.get("alternatives", []))
     print("\nSuper-regex construido:", super_regex)
     
-    # Procesar el super-regex
+    # Procesar el super-regex (construir AST, DFA, etc.)
     afd_service = process_regex(super_regex, test_strings)
     
     # Devolver el servicio AFD por si se necesita para más pruebas
@@ -105,6 +132,7 @@ if __name__ == '__main__':
     # Configurar el parser de argumentos
     parser = argparse.ArgumentParser(description='Procesador de expresiones regulares y archivos YAL.')
     parser.add_argument('--yal', help='Ruta a un archivo .yal')
+    parser.add_argument('--scan_file', help='Ruta a un archivo de entrada para escaneo')
     parser.add_argument('--file', '-f', help='Ruta a un archivo con patrones regex')
     parser.add_argument('--regex', '-r', help='Expresión regular directa')
     parser.add_argument('--test', '-t', nargs='+', help='Cadenas de prueba')
@@ -117,7 +145,11 @@ if __name__ == '__main__':
     
     # Procesar un archivo .yal si se proporciona
     if args.yal:
-        process_yal_file(args.yal, test_strings)
+        afd_service = process_yal_file(args.yal, test_strings)
+
+        if args.scan_file and afd_service:
+            scan_input_file(args.scan_file, afd_service)
+        
         exit(0)
     
     # Procesar regex desde un archivo o entrada directa
@@ -130,6 +162,13 @@ if __name__ == '__main__':
     
     if args.regex:
         regex_list.append(args.regex)
+    
+    if args.scan_file:
+        # Se asume que el DFA se construye a partir de la primera regex o de un archivo .yal.
+        # Aquí se utiliza el primer regex de la lista; ajusta según tus necesidades.
+        afd_service = process_regex(regex_list[0], test_strings)
+        scan_input_file(args.scan_file, afd_service)
+        exit(0)
     
     # Usar regex predeterminado si no se proporciona entrada
     if not regex_list:

@@ -8,7 +8,66 @@ from ..utils.ast_functions import (
     get_alphabet
 )
 
-def build_direct_dfa(ast):
+def build_direct_dfa(ast, already_marked=False):
+    from afd_compiler.models.position import Position
+    from afd_compiler.models.dfa import DFA
+    from afd_compiler.utils.ast_functions import traverse_tree, calculate_node_functions, calculate_followpos, get_alphabet
+
+    Position.reset_counter()
+    
+    # Si no está marcado, se agrega el marcador de fin
+    if not already_marked:
+        end_marker = ASTNode('CHAR', '#', [])
+        new_root = ASTNode('OPERATOR', '&', [ast, end_marker])
+    else:
+        new_root = ast
+
+    # Inicializar funciones para cada nodo
+    for node in traverse_tree(new_root):
+        node.nullable = False
+        node.firstpos = set()
+        node.lastpos = set()
+    
+    calculate_node_functions(new_root)
+    followpos = calculate_followpos(new_root)
+    alphabet = get_alphabet(new_root)
+    initial_state = frozenset(new_root.firstpos)
+    
+    states = {initial_state}
+    unmarked_states = {initial_state}
+    transitions = {}
+    accepting_states = set()
+    state_tokens = {}  # Aquí guardaremos el token asignado a cada estado
+    
+    while unmarked_states:
+        current_state = unmarked_states.pop()
+        
+        # Revisa si en el estado hay alguna posición que sea un marcador (por ejemplo, cuyo símbolo comience con '#')
+        token_for_state = None
+        for pos in current_state:
+            if isinstance(pos.symbol, str) and pos.symbol.startswith('#'):
+                token_for_state = pos.symbol[1:]  # Quita el '#' para obtener el token
+                break
+        
+        if token_for_state:
+            accepting_states.add(current_state)
+            state_tokens[current_state] = token_for_state
+        
+        for symbol in alphabet:
+            next_state = set()
+            for pos in current_state:
+                if pos.symbol == symbol:
+                    next_state.update(followpos.get(pos, set()))
+            if next_state:
+                next_state = frozenset(next_state)
+                transitions[(current_state, symbol)] = next_state
+                if next_state not in states:
+                    states.add(next_state)
+                    unmarked_states.add(next_state)
+    
+    dfa = DFA(states, alphabet, transitions, initial_state, accepting_states)
+    dfa.state_tokens = state_tokens
+    return dfa
     """
     Construye un AFD utilizando el método directo a partir del AST.
     Preserva la información de token para cada estado de aceptación.
@@ -72,6 +131,6 @@ def build_direct_dfa(ast):
     dfa = DFA(states, alphabet, transitions, initial_state, accepting_states)
     
     # Añadir información de tokens (esto podría requerir modificar la clase DFA)
-    # dfa.state_tokens = state_tokens
+    dfa.state_tokens = state_tokens
     
     return dfa
