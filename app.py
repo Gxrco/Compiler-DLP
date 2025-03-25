@@ -9,52 +9,42 @@ from chain_compiler.tools.yal_parser import parse_yal_file
 from chain_compiler.tools.super_regex_builder import build_super_regex
 
 def scan_input_file(filepath, yal_rules):
-    """
-    Lee un archivo de entrada y utiliza expresiones regulares para extraer tokens.
-    Construye y muestra la tabla de símbolos (tokens válidos).
-    
-    Args:
-        filepath (str): Ruta al archivo de entrada.
-        yal_rules (list): Lista de tuplas (patrón_regex, token_type).
-    """
     patterns = []
     for regex, tok in yal_rules:
-        clean = regex.strip().replace("'", "").replace('"', "")
         try:
-            pattern = re.compile(rf'^{clean}')
+            pat = re.compile(rf'^{regex.strip()}')
         except re.error:
-            pattern = re.compile(rf'^{re.escape(clean)}')
-        patterns.append((pattern, tok))
-    
+            pat = re.compile(rf'^{re.escape(regex.strip())}')
+        patterns.append((pat, tok))
+
     symbol_table = []
     with open(filepath, encoding='utf-8') as f:
         for lineno, line in enumerate(f, 1):
             pos = 0
-            line_tokens = []  # Para mostrar los tokens encontrados por línea
-            
             while pos < len(line):
                 best = None
                 for pat, tok in patterns:
                     m = pat.match(line[pos:])
                     if m and (not best or len(m.group(0)) > len(best[0])):
                         best = (m.group(0), tok)
-                
                 if best:
                     lex, token = best
-                    if token != "lexbuf":
-                        symbol_table.append({"line": lineno, "token": token, "lexeme": lex})
-                        line_tokens.append((token, lex))
+                    if token not in ("lexbuf", "EOL"):
+                        symbol_table.append((lineno, token, lex))
                     pos += len(lex)
                 else:
-                    symbol_table.append({"line": lineno, "token": "ERROR", "lexeme": line[pos]})
-                    line_tokens.append(("ERROR", line[pos]))
                     pos += 1
-            
-            print(f"Línea {lineno}: {line_tokens}")
-    
+
+    # Imprimir tabla formateada
     print("\nTabla de símbolos:")
-    for entry in symbol_table:
-        print(entry)
+    header = ("Line", "Token", "Lexeme")
+    widths = [max(len(str(r[i])) for r in ([header] + symbol_table)) for i in range(3)]
+    print(f"{header[0]:<{widths[0]}}  {header[1]:<{widths[1]}}  {header[2]:<{widths[2]}}")
+    print("-" * (sum(widths) + 4))
+    for line, token, lex in symbol_table:
+        print(f"{line:<{widths[0]}}  {token:<{widths[1]}}  {lex:<{widths[2]}}")
+
+        
 
 def process_regex(super_regex, test_strings=None):
     """
