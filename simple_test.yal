@@ -1,0 +1,21 @@
+
+{
+# Simple test file
+}
+
+let DIGIT = [0-9]
+let LETTER = [a-zA-Z]
+let VOWEL = [aeiou]
+let CONSONANT = [a-z]#[aeiou]
+
+rule lexer =
+  {CONSONANT}+       { return "CONSONANT"; }
+  {VOWEL}+           { return "VOWEL"; }
+  {DIGIT}+           { return "NUMBER"; }
+  {LETTER}({LETTER}|{DIGIT})*  { return "IDENTIFIER"; }
+  "+"                { return "PLUS"; }
+  "-"                { return "MINUS"; }
+  "*"                { return "MULTIPLY"; }
+  "/"                { return "DIVIDE"; }
+  "="                { return "ASSIGN"; }
+  " "                { return "SPACE"; }

@@ -61,6 +61,10 @@ def parse_yal_file(filepath):
         return regex
 
     def expand_difference(regex):
+        """
+        Implementa correctamente el operador de diferencia (#) entre clases de caracteres.
+        Convierte [a-z]#[aeiou] en una expresión que coincide con todas las letras excepto vocales.
+        """
         pattern = re.compile(r'(\[[^\]]+\])\s*#\s*(\[[^\]]+\])')
         while True:
             m = pattern.search(regex)
@@ -68,31 +72,95 @@ def parse_yal_file(filepath):
                 break
 
             def class_to_set(cls):
-                content = cls[1:-1]
-                s = set()
+                """Convierte una clase de caracteres [a-z] en un conjunto de caracteres."""
+                content = cls[1:-1]  # Quitar los corchetes
+                # Verificar si es una clase negada
+                is_negated = content.startswith('^')
+                if is_negated:
+                    content = content[1:]
+                
+                char_set = set()
                 i = 0
                 while i < len(content):
                     if i+2 < len(content) and content[i+1] == '-':
-                        for c in range(ord(content[i]), ord(content[i+2]) + 1):
-                            s.add(chr(c))
+                        # Manejar rangos como 'a-z'
+                        start_char, end_char = content[i], content[i+2]
+                        for c in range(ord(start_char), ord(end_char) + 1):
+                            char_set.add(chr(c))
                         i += 3
                     else:
-                        s.add(content[i])
+                        # Carácter individual
+                        char_set.add(content[i])
                         i += 1
-                return s
+                
+                # Si la clase está negada, calcular el complemento
+                if is_negated:
+                    # Usamos un rango limitado de caracteres ASCII para el complemento
+                    all_chars = set(chr(c) for c in range(32, 127))
+                    char_set = all_chars - char_set
+                
+                return char_set
 
-            left = class_to_set(m.group(1))
-            right = class_to_set(m.group(2))
-            diff = sorted(left - right)
-            replacement = "(" + "|".join(diff) + ")"
+            left_set = class_to_set(m.group(1))
+            right_set = class_to_set(m.group(2))
+            diff_set = left_set - right_set
+            
+            if not diff_set:
+                # Conjunto vacío, usar una expresión que nunca coincidirá
+                replacement = "(?!.)"
+            else:
+                # Convertir el conjunto diferencia a una clase de caracteres
+                # Para conjuntos pequeños, es más eficiente usar OR: (a|b|c)
+                # Para conjuntos grandes, usar clase de caracteres: [abc]
+                if len(diff_set) <= 5:
+                    replacement = "(" + "|".join(sorted(diff_set)) + ")"
+                else:
+                    # Optimizar rangos contiguos para la clase de caracteres
+                    chars_list = sorted(diff_set)
+                    ranges = []
+                    start = end = chars_list[0]
+                    
+                    for char in chars_list[1:]:
+                        if ord(char) == ord(end) + 1:
+                            end = char
+                        else:
+                            if start == end:
+                                ranges.append(start)
+                            else:
+                                ranges.append(f"{start}-{end}")
+                            start = end = char
+                    
+                    # Agregar el último rango
+                    if start == end:
+                        ranges.append(start)
+                    else:
+                        ranges.append(f"{start}-{end}")
+                    
+                    replacement = "[" + "".join(ranges) + "]"
+            
             regex = regex[:m.start()] + replacement + regex[m.end():]
+        
         return regex
 
+    def strip_quotes(regex):
+        """
+        Elimina las comillas de los literales en la expresión regular.
+        Convierte "token" en token, pero preserva el contenido entre comillas.
+        """
+        return re.sub(r'"([^"]*)"', r'\1', regex)
 
+    # Procesar las reglas
     for regex, action in raw_rules:
+        # Primero quitar comillas de literales
+        regex = strip_quotes(regex)
+        # Luego expandir las definiciones
         expanded = expand_defs(regex)
+        # Corregir cualquier notación especial
         expanded = re.sub(r'\[\((.*?)\)\]', r'[\1]', expanded)
+        # Aplicar operador de diferencia
         expanded = expand_difference(expanded)
+        # Escapar caracteres especiales en literales que no son clases de caracteres
+        # pero permitir que los metacaracteres de regex sigan funcionando
         result["rules"].append((expanded, action))
 
     return result

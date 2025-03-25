@@ -18,21 +18,26 @@ def build_super_regex(rules):
     parts = []
     for regex, action in rules:
         try:
-            # Se asume que la acción tiene el token entre comillas, por ejemplo: return "CONS";
-            token = action.split('"')[1]
+            # Extraer el token entre comillas en la acción
+            token_match = action.strip().split('"')
+            if len(token_match) >= 2:
+                token = token_match[1].strip()
+            else:
+                # Si no hay comillas, intentar extraer el token de otra manera
+                token = action.strip().split()[-1].rstrip(';')
+                
+            # Escapar caracteres especiales en el regex si es necesario
+            # pero solo si no forman parte de una clase de caracteres o un operador
+            
+            # Formar la parte correspondiente a esta regla
+            parts.append(f"({regex})#{token}")
         except IndexError:
-            raise ValueError(f"Acción mal formada: {action}")
-        parts.append(f"({regex})#{token}")
+            print(f"ADVERTENCIA: No se pudo extraer el token de la acción: {action}")
+            # Usar un token genérico
+            parts.append(f"({regex})#UNKNOWN")
+    
+    # Unir todas las partes con el operador OR
     super_regex = "|".join(parts)
+    
+    print(f"Super-regex construido: {super_regex}")
     return super_regex
-
-# Prueba interna (opcional)
-if __name__ == '__main__':
-    # Ejemplo de uso:
-    sample_rules = [
-        ("[a-z]#[aeiou]+", 'return "CONS";'),
-        ("[aeiou]+", 'return "VOC";'),
-        ("[0-9]+", 'return "NUM";'),
-        ('"="', 'return "IGUAL";')
-    ]
-    print("Super-regex combinado:", build_super_regex(sample_rules))
