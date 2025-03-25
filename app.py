@@ -1,196 +1,97 @@
+import argparse, re
 from chain_compiler.normalizer import normalize_regex
 from chain_compiler.parser import parse_tokens
 from chain_compiler.ast_service import generate_ast, build_ast_graph
 from afd_compiler.service import AFDService
 from file_processor import read_regex_from_file
-import argparse
 from chain_compiler.tools.yal_parser import parse_yal_file
-import re
 from chain_compiler.tools.super_regex_builder import build_super_regex
 
-def scan_input_file(filepath, afd_service):
-    """
-    Lee un archivo de entrada y utiliza el método scan_input del AFD para extraer tokens.
-    Construye y muestra la tabla de símbolos (tokens válidos).
-    
-    Args:
-        filepath (str): Ruta al archivo de entrada.
-        afd_service (AFDService): Instancia del servicio AFD ya construido.
-    """
+def scan_input_file(filepath, yal_rules):
+    patterns = []
+    for regex, tok in yal_rules:
+        clean = regex.strip().replace("'", "").replace('"', "")
+        try:
+            pattern = re.compile(rf'^{clean}')
+        except re.error:
+            pattern = re.compile(rf'^{re.escape(clean)}')
+        patterns.append((pattern, tok))
+
     symbol_table = []
-    with open(filepath, 'r', encoding='utf-8') as f:
-        for line_number, line in enumerate(f, start=1):
-            line = line.rstrip('\n')
-            tokens = afd_service.scan_input(line)
-            print(f"Línea {line_number}: {tokens}")
-            for token_type, lexeme in tokens:
-                # Agregar a la tabla solo tokens válidos; se ignoran los errores o tokens a omitir.
-                if token_type not in ["ERROR", "SPACE"]:
-                    symbol_table.append({
-                        "line": line_number,
-                        "token": token_type,
-                        "lexeme": lexeme
-                    })
+    with open(filepath, encoding='utf-8') as f:
+        for lineno, line in enumerate(f, 1):
+            pos = 0
+            while pos < len(line):
+                best = None
+                for pat, tok in patterns:
+                    m = pat.match(line[pos:])
+                    if m and (not best or len(m.group(0)) > len(best[0])):
+                        best = (m.group(0), tok)
+                if best:
+                    lex, token = best
+                    if token != "lexbuf":
+                        symbol_table.append({"line": lineno, "token": token, "lexeme": lex})
+                    pos += len(lex)
+                else:
+                    symbol_table.append({"line": lineno, "token": "ERROR", "lexeme": line[pos]})
+                    pos += 1
+
     print("\nTabla de símbolos:")
     for entry in symbol_table:
         print(entry)
 
-def process_regex(regex, test_strings=None):
-    """
-    Procesa una expresión regular, construye el AST, el DFA y lo prueba con cadenas de prueba.
-    
-    Args:
-        regex (str): La expresión regular a procesar
-        test_strings (list): Lista opcional de cadenas para probar
-    """
-    print("Expresión regular:", regex)
-    
-    # Tokenizar la regex
-    tokens = normalize_regex(regex)
-    print("Tokens normalizados:", tokens)
-    
-    # Convertir a notación postfix
-    postfix = parse_tokens(tokens)
-    print("Notación postfix:", postfix)
-    
-    # Generar el AST
-    ast = generate_ast(postfix)
-    print("AST:")
+
+
+
+def process_regex(super_regex, test_strings=None):
+    print("Expresión regular:", super_regex)
+    tokens=normalize_regex(super_regex)
+    postfix=parse_tokens(tokens)
+    ast=generate_ast(postfix)
     print(ast.pretty_print())
-    
-    # Construir y visualizar el AST
-    ast_graph = build_ast_graph(ast)
-    ast_graph.render('ast_graph', view=False)
-    
-    # Construir el DFA a partir del AST
-    afd_service = AFDService()
-    dfa = afd_service.build_dfa_from_ast(ast)
-    
-    # Generar un nombre de archivo único para el DFA normal
-    safe_regex = regex.replace("?", "optional").replace("*", "star").replace("+", "plus").replace("|", "or")
-    safe_regex = re.sub(r'[^\w\-_]', '', safe_regex)
-    normal_filename = f'dfa_normal_{safe_regex[:30]}'
-    dfa.visualize(normal_filename)
-    
-    # Minimizar el DFA
-    minimized_dfa = afd_service.minimize_dfa()
-    
-    # Generar un nombre de archivo único para el DFA minimizado
-    minimized_filename = f'dfa_minimized_{safe_regex[:30]}'
-    minimized_dfa.visualize(minimized_filename)
-    
-    # Probar cadenas con el DFA minimizado
-    if test_strings is None:
-        test_strings = ["bcdfghjklmnpqrstvwxyz"]  # Cadenas de prueba predeterminadas
-    
-    print("\nProbando cadenas con el AFD minimizado:")
-    for s in test_strings:
-        result = afd_service.match(s)
-        status = 'Aceptada' if result else 'Rechazada'
-        token = f" (Token: {result})" if result else ""
-        print(f"'{s}': {status}{token}")
-    
-    print("=" * 40)
-    return afd_service
+    graph=build_ast_graph(ast); graph.render('ast_graph',view=False)
+    afd=AFDService(); afd.build_dfa_from_ast(ast)
+    afd.minimize_dfa()
+    return afd
 
-def process_yal_file(filepath, test_strings=None):
-    """
-    Procesa un archivo .yal, extrae los bloques de header, la regla principal y las alternativas,
-    y construye el super-regex.
-    
-    Args:
-        filepath (str): Ruta al archivo .yal.
-        test_strings (list): Lista opcional de cadenas para probar.
-    """
-    print(f"Procesando archivo YAL: {filepath}")
-    
-    # Parsear el archivo .yal usando el nuevo parser
-    yal_info = parse_yal_file(filepath)
-    if not yal_info:
-        print("Error al parsear el archivo .yal")
-        return
-    
-    # Mostrar el header
-    if yal_info.get("header"):
-        print("Header:")
-        print(yal_info["header"])
-    
-    # Mostrar la regla principal
-    if yal_info.get("rule"):
-        print("Regla principal encontrada:", yal_info["rule"])
-    
-    # Mostrar las alternativas encontradas
-    print("\nAlternativas encontradas:")
-    for regex, action in yal_info.get("alternatives", []):
-        print(f"  {regex} => {action}")
-    
-    # Mostrar el trailer si existe
-    if yal_info.get("trailer"):
-        print("\nTrailer:")
-        print(yal_info["trailer"])
-    
-    # Construir el super-regex a partir de las alternativas
-    super_regex = build_super_regex(yal_info.get("alternatives", []))
-    print("\nSuper-regex construido:", super_regex)
-    
-    # Procesar el super-regex (construir AST, DFA, etc.)
-    afd_service = process_regex(super_regex, test_strings)
-    
-    # Devolver el servicio AFD por si se necesita para más pruebas
-    return afd_service
+def process_yal_file(path, scan_file=None):
+    info=parse_yal_file(path)
+    if not info: return
+    print("Header:\n",info.get("header",""))
+    print("Rule:", info["rule"])
+    print("Alternativas:")
+    for r,a in info["alternatives"]: print(f"  {r} => {a}")
+    print("Trailer:\n",info.get("trailer",""))
 
-if __name__ == '__main__':
-    # Configurar el parser de argumentos
-    parser = argparse.ArgumentParser(description='Procesador de expresiones regulares y archivos YAL.')
-    parser.add_argument('--yal', help='Ruta a un archivo .yal')
-    parser.add_argument('--scan_file', help='Ruta a un archivo de entrada para escaneo')
-    parser.add_argument('--file', '-f', help='Ruta a un archivo con patrones regex')
-    parser.add_argument('--regex', '-r', help='Expresión regular directa')
-    parser.add_argument('--test', '-t', nargs='+', help='Cadenas de prueba')
-    parser.add_argument('--concat', '-c', action='store_true', 
-                        help='Concatenar todos los patrones regex en uno solo')
-    args = parser.parse_args()
+    yal_rules = []
+    for regex, action in info["alternatives"]:
+        # Extraer token: primero busca return "TOKEN" o return 'TOKEN'
+        m = re.search(r'return\s+[\'"]([^\'"]+)[\'"]', action)
+        if m:
+            token = m.group(1)
+        elif "return" in action:
+            # Si no hay comillas, toma la función (int, etc.) como token
+            token = re.match(r'return\s*([A-Za-z_]\w*)', action).group(1).upper()
+        elif "raise" in action:
+            token = "EOF"
+        else:
+            token = "UNKNOWN"
+
+        # Limpiar el patrón — quitar comillas internas, mantener clases intactas
+        clean = regex.strip().replace("'", "").replace('"', "")
+        yal_rules.append((clean, token))
+
     
-    # Configurar cadenas de prueba
-    test_strings = args.test if args.test else None
-    
-    # Procesar un archivo .yal si se proporciona
+    super_regex=build_super_regex(info["alternatives"])
+    afd=process_regex(super_regex)
+    if scan_file:
+        scan_input_file(scan_file, yal_rules)
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser()
+    p.add_argument('--yal'); p.add_argument('--scan_file')
+    args=p.parse_args()
     if args.yal:
-        afd_service = process_yal_file(args.yal, test_strings)
-
-        if args.scan_file and afd_service:
-            scan_input_file(args.scan_file, afd_service)
-        
-        exit(0)
-    
-    # Procesar regex desde un archivo o entrada directa
-    regex_list = []
-    
-    if args.file:
-        regex_list = read_regex_from_file(args.file)
-        if not regex_list:
-            print("No se encontraron patrones regex válidos en el archivo. Usando patrones predeterminados.")
-    
-    if args.regex:
-        regex_list.append(args.regex)
-    
-    if args.scan_file:
-        # Se asume que el DFA se construye a partir de la primera regex o de un archivo .yal.
-        # Aquí se utiliza el primer regex de la lista; ajusta según tus necesidades.
-        afd_service = process_regex(regex_list[0], test_strings)
-        scan_input_file(args.scan_file, afd_service)
-        exit(0)
-    
-    # Usar regex predeterminado si no se proporciona entrada
-    if not regex_list:
-        regex_list = ["[a-z]#[aeiou]+"]
-    
-    # Manejar la concatenación si se solicita
-    if args.concat and len(regex_list) > 1:
-        concatenated_regex = ''.join(regex_list)
-        print(f"Regex concatenado: {concatenated_regex}")
-        process_regex(concatenated_regex, test_strings)
+        process_yal_file(args.yal, args.scan_file)
     else:
-        # Procesar cada regex por separado
-        for regex in regex_list:
-            process_regex(regex, test_strings)
+        print("Use --yal <archivo>.")
