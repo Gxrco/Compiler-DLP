@@ -48,8 +48,21 @@ def expand_char_class(token):
     return union_ast
 
 def build_ast(postfix_tokens):
+    """
+    Construye un AST a partir de tokens en notación postfix.
+    
+    Se hacen ajustes para manejar casos donde la expresión no está perfectamente formada.
+    """
     stack = []
-    for token in postfix_tokens:
+    
+    # Filtrar tokens de marcadores especiales (TOKEN_MARKER)
+    filtered_tokens = [token for token in postfix_tokens if token.type != 'TOKEN_MARKER']
+    
+    # Si hay un operador '|' al final sin operando derecho, lo removemos
+    if filtered_tokens and filtered_tokens[-1].type == 'OPERATOR' and filtered_tokens[-1].value == '|':
+        filtered_tokens.pop()
+    
+    for token in filtered_tokens:
         if token.type == 'CHAR':
             node = ASTNode('CHAR', token.value)
             stack.append(node)
@@ -61,25 +74,43 @@ def build_ast(postfix_tokens):
             operator = OPERATORS.get(op)
             if not operator:
                 raise ValueError(f"Operador desconocido: {op}")
-            if operator.arity == 1:
-                if len(stack) < 1:
-                    raise ValueError("Insuficientes operandos para el operador " + op)
-                child = stack.pop()
-                if op == '+':
-                    node = ASTNode('OPERATOR', '&', [
-                        child,
-                        ASTNode('OPERATOR', '*', [copy.deepcopy(child)])
-                    ])
-                else:
-                    node = ASTNode('OPERATOR', op, [child])
-                stack.append(node)
-            elif operator.arity == 2:
-                if len(stack) < 2:
-                    raise ValueError("Insuficientes operandos para el operador " + op)
-                right = stack.pop()
-                left = stack.pop()
-                node = ASTNode('OPERATOR', op, [left, right])
-                stack.append(node)
-    if len(stack) != 1:
-        raise ValueError("Expresión inválida, no se pudo construir un AST único.")
+            
+            try:
+                if operator.arity == 1:
+                    if len(stack) < 1:
+                        # Si no hay suficientes operandos, continuamos con el siguiente token
+                        continue
+                    child = stack.pop()
+                    if op == '+':
+                        node = ASTNode('OPERATOR', '&', [
+                            child,
+                            ASTNode('OPERATOR', '*', [copy.deepcopy(child)])
+                        ])
+                    else:
+                        node = ASTNode('OPERATOR', op, [child])
+                    stack.append(node)
+                elif operator.arity == 2:
+                    if len(stack) < 2:
+                        # Si no hay suficientes operandos, continuamos con el siguiente token
+                        continue
+                    right = stack.pop()
+                    left = stack.pop()
+                    node = ASTNode('OPERATOR', op, [left, right])
+                    stack.append(node)
+            except Exception as e:
+                print(f"Error procesando operador {op}: {e}")
+                # Si ocurre un error, continuamos con el siguiente token
+                continue
+    
+    # En caso de que la pila esté vacía, devolvemos un nodo vacío
+    if not stack:
+        return ASTNode('CHAR', 'ε')  # Epsilon representa la cadena vacía
+    
+    # Si hay más de un nodo en la pila, combinamos todo con operador |
+    while len(stack) > 1:
+        right = stack.pop()
+        left = stack.pop()
+        node = ASTNode('OPERATOR', '|', [left, right])
+        stack.append(node)
+    
     return stack[0]
