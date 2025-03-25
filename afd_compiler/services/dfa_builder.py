@@ -72,6 +72,6 @@ def build_direct_dfa(ast):
     dfa = DFA(states, alphabet, transitions, initial_state, accepting_states)
     
     # Añadir información de tokens (esto podría requerir modificar la clase DFA)
-    # dfa.state_tokens = state_tokens
+    dfa.state_tokens = state_tokens
     
     return dfa
