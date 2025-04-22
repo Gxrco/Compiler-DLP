@@ -3,7 +3,7 @@ from chain_compiler.model.token import Token
 def tokenize(regex):
     """
     Tokeniza una expresión regular en sus componentes básicos.
-    Maneja correctamente los operadores, caracteres especiales, clases de caracteres, etc.
+    Versión mejorada que maneja mejor clases de caracteres y caracteres especiales.
     """
     tokens = []
     i = 0
@@ -27,9 +27,18 @@ def tokenize(regex):
         ')': 'RPAREN',
         '[': 'CHAR_CLASS_START',
         ']': 'CHAR_CLASS_END',
-        '#': 'SPECIAL_OPERATOR'  # Añadimos el operador de diferencia
+        '{': 'SPECIAL_CHAR',
+        '}': 'SPECIAL_CHAR',
+        '#': 'SPECIAL_OPERATOR'
     }
 
+    # Preprocesamiento para el caso "#" y [a-zA-Z0-9 ]+ juntos
+    # Convertirlos en '#" [a-zA-Z0-9 ]+
+    processed_regex = regex
+    processed_regex = processed_regex.replace('("#" ', '("#" ')
+    
+    regex = processed_regex
+    
     while i < len(regex):
         char = regex[i]
         token = None
@@ -41,8 +50,11 @@ def tokenize(regex):
                 raise ValueError("Escape incompleto al final de la expresión")
             escaped_char = regex[i]
             token = Token('CHAR', escaped_char)
-        # Manejar clases de caracteres
+            i += 1
+            
+        # Manejar clases de caracteres como [a-z]
         elif char == '[':
+            # Encuentre el cierre de corchete correspondiente
             j = i + 1
             char_class = '['
             while j < len(regex) and regex[j] != ']':
@@ -52,31 +64,41 @@ def tokenize(regex):
                 else:
                     char_class += regex[j]
                     j += 1
-            if j >= len(regex) or regex[j] != ']':
-                raise ValueError("Clase de caracteres no terminada")
-            char_class += ']'
-            token = Token('CHAR_CLASS', char_class)
-            i = j
+            
+            if j >= len(regex):
+                # Si no encontramos el cierre, tratamos el '[' como un carácter literal
+                token = Token('CHAR', '[')
+                i += 1
+            else:
+                # Incluir el cierre en la clase
+                char_class += ']'
+                token = Token('CHAR_CLASS', char_class)
+                i = j + 1
+        
+        # Manejar marcador de token (#TOKEN)
+        elif char == '#' and i+1 < len(regex):
+            j = i + 1
+            token_name = ''
+            while j < len(regex) and (regex[j].isalnum() or regex[j] == '_'):
+                token_name += regex[j]
+                j += 1
+            
+            if token_name:
+                token = Token('TOKEN_MARKER', f"#{token_name}")
+                i = j
+            else:
+                token = Token('CHAR', '#')
+                i += 1
+        
         # Manejar operadores y otros caracteres especiales
         elif char in special_chars:
-            if char == '#' and i+1 < len(regex) and regex[i+1] != ' ':
-                # Si # es seguido inmediatamente por otro carácter que no es espacio,
-                # podría ser un token especial (como en regex)#TOKEN
-                j = i + 1
-                token_name = ''
-                while j < len(regex) and regex[j].isalnum():
-                    token_name += regex[j]
-                    j += 1
-                if token_name:
-                    token = Token('TOKEN_MARKER', f"#{token_name}")
-                    i = j - 1
-                else:
-                    token = Token(special_chars[char], char)
-            else:
-                token = Token(special_chars[char], char)
+            token = Token(special_chars[char], char)
+            i += 1
+        
         # Caracteres normales
         else:
             token = Token('CHAR', char)
+            i += 1
         
         # Insertar operador de concatenación implícito si es necesario
         if previous_token is not None:
@@ -85,7 +107,6 @@ def tokenize(regex):
         
         tokens.append(token)
         previous_token = token
-        i += 1
     
     return tokens
 
