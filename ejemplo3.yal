@@ -1,7 +1,4 @@
 (* ejemplo.yal *)
-{
-import myToken
-}
 
 rule gettoken =
   [' ' '\t'] { return lexbuf } (* skip blanks *)
