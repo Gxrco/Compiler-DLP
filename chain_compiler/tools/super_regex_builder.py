@@ -52,7 +52,7 @@ def clean_regex_part(regex):
 
     return result
 
-def build_super_regex(rules, sentinel='␦'):
+def build_super_regex(rules, sentinel='#'):
     """
     Construye la super-regex concatenando cada patrón y su marcador,
     y añade el sentinel como alternativa separada.
@@ -80,7 +80,7 @@ def build_super_regex(rules, sentinel='␦'):
         parts.append(f"({regex_clean}){marker}")
 
     # añadir sentinel como última alternativa
-    parts.append(f"({sentinel})")
+    parts.append(f"({re.escape(sentinel)})")
     super_regex = "|".join(parts)
 
     print(f"Super-regex construido: {super_regex}")

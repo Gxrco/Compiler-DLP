@@ -10,7 +10,7 @@ def generate_lexer_py(yal_info: dict, output_path: str):
     trailer      = yal_info.get('trailer', '').strip()
     alternatives = yal_info.get('alternatives', [])
 
-    super_regex, token_names = build_super_regex(alternatives)
+    super_regex, token_names = build_super_regex(alternatives, sentinel='#')
 
     with open(output_path, 'w', encoding='utf-8') as f:
         # --- Cabecera del usuario ---
@@ -42,7 +42,7 @@ def generate_lexer_py(yal_info: dict, output_path: str):
         f.write("    \"\"\"Escanea el buffer y devuelve lista de (token, lexeme),\n")
         f.write("       descartando espacios y comentarios. Añade '#' al final como sentinel.\"\"\"\n")
         f.write("    # agregamos '#' para que cada patrón dispare su marcador de token al terminar\n")
-        f.write("    tokens = afd_service.scan_input(buffer + '#')\n")
+        f.write("    tokens = afd_service.scan_input(buffer + '#')\n")  # aquí buffer + '#' coincide con el sentinel
         f.write("    return [(tok,lex) for tok,lex in tokens\n")
         f.write("            if tok not in ('WHITESPACE','COMMENT')]\n\n")
         

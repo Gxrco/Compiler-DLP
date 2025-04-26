@@ -9,18 +9,26 @@ def minimize_dfa(dfa: DFA) -> DFA:
     """
     Minimiza un DFA usando Hopcroft y preserva el mapa state_tokens.
     """
-    # 1) Partición inicial por aceptación / no-aceptación
-    Q    = set(dfa.states)
-    F    = set(dfa.accepting_states)
-    nonF = Q - F
+    # 1) Partición inicial: separamos no-aceptantes y, entre los aceptantes,
+    #    un bloque POR CADA token distinto.
+    Q     = set(dfa.states)
+    F     = set(dfa.accepting_states)
+    nonF  = Q - F
 
+    # Bloque de no-aceptantes
     P = []
-    if F:
-        P.append(F)
     if nonF:
         P.append(nonF)
 
-    W = list(P)  # work list
+    # Bloques de aceptantes, uno para cada token
+    token_to_states = {}
+    for s in F:
+        tok = dfa.state_tokens[s]
+        token_to_states.setdefault(tok, set()).add(s)
+    P.extend(token_to_states.values())
+
+    # La “work list” arranca con todos esos bloques
+    W = list(P)
 
     # 2) Refinar la partición
     while W:
