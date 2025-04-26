@@ -53,6 +53,26 @@ def clean_regex_part(regex):
     # 5) Asegurar que no haya saltos de línea residuales
     return result.replace('\n', r'\n').replace('\r', r'\r')
 
+def remove_space_outside_classes(s: str) -> str:
+    """
+    Elimina espacios que no estén dentro de clases de caracteres '[...]'.
+    """
+    out = []
+    in_cls = False
+    for ch in s:
+        if ch == '[':
+            in_cls = True
+            out.append(ch)
+        elif ch == ']':
+            in_cls = False
+            out.append(ch)
+        elif ch == ' ' and not in_cls:
+            # omitimos espacio fuera de clase
+            continue
+        else:
+            out.append(ch)
+    return ''.join(out)
+
 def build_super_regex(rules):
     """
     Como antes, pero cada patrón ya viene sin líneas.
@@ -63,6 +83,7 @@ def build_super_regex(rules):
     for idx, (raw_regex, action) in enumerate(rules):
         pattern = raw_regex.strip()
         regex_clean = clean_regex_part(pattern)
+        regex_clean = remove_space_outside_classes(regex_clean)
 
         # Extraer nombre de token
         m = re.search(r'return\s+([A-Za-z_]\w*)', action)

@@ -74,17 +74,10 @@ def calculate_followpos(node, followpos=None):
     return followpos
 
 def get_alphabet(node, alphabet=None):
-    """
-    Obtiene el alfabeto de la expresión regular.
-    Ahora **incluye** el carácter '#' (el marcador de fin de patrón).
-    """
     if alphabet is None:
         alphabet = set()
-
-    if node.type == 'CHAR':
+    if node.type == 'CHAR' and ord(node.value) >= 32:
         alphabet.add(node.value)
-
     for child in node.children:
         get_alphabet(child, alphabet)
-
     return alphabet

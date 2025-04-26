@@ -12,6 +12,8 @@ def generate_lexer_py(yal_info: dict, output_path: str):
 
     # 1) Construir super-regex **y** token_names
     super_regex, token_names = build_super_regex(alternatives)
+    # Quitar saltos de línea reales y reemplazarlos por '\n' literales
+    super_regex = super_regex.replace('\r', '').replace('\n', r'\n')
 
     with open(output_path, 'w', encoding='utf-8') as f:
         # --- Cabecera del usuario ---

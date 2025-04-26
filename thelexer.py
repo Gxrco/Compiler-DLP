@@ -1,6 +1,5 @@
 token_names = ['COMMENT', 'IF', 'ELSE', 'WHILE', 'EQUALS', 'NOTEQUAL', 'GREATEREQ', 'LESSEQ', 'LESS', 'GREATER', 'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'LPAREN', 'RPAREN', 'LBRACKET', 'LBRACE', 'RBRACE', 'COLON', 'SEMICOLON', 'ASSIGN', 'COMMA', 'ID', 'NUMBER', 'WHITESPACE']
-super_regex = r'''(\#[^\n]*)|(if)|(else)|(while)|(==)|(!=)|(>=)|(<=)|(<)	|(>)
-|(\+)|(\-)|(\*)|(/)|(\()|(\))|(\[)|(")|(\})|(:)|(;)|(=)|(,)|([a-zA-Z][a-zA-Z0-9]*)|([0-9]+)|([ \t\n\r])'''
+super_regex = r'''(\#[^\n]*)|(if)|(else)|(while)|(==)|(!=)|(>=)|(<=)|(<)	|(>)\n|(\+)|(\-)|(\*)|(/)|(\()|(\))|(\[)|(")|(\})|(:)|(;)|(=)|(,)|([a-zA-Z][a-zA-Z0-9]*)|([0-9]+)|([ \t\n\r])'''
 
 from chain_compiler.normalizer import normalize_regex
 from chain_compiler.parser     import parse_tokens
