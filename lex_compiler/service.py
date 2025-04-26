@@ -1,5 +1,6 @@
 # lex_compiler/service.py
-from chain_compiler.tools.super_regex_builder import build_super_regex
+
+from chain_compiler.tools.super_regex_builder import build_super_regex, DEFAULT_SENTINEL
 
 def generate_lexer_py(yal_info: dict, output_path: str):
     """
@@ -10,7 +11,8 @@ def generate_lexer_py(yal_info: dict, output_path: str):
     trailer      = yal_info.get('trailer', '').strip()
     alternatives = yal_info.get('alternatives', [])
 
-    super_regex, token_names = build_super_regex(alternatives, sentinel='#')
+    # Construimos super_regex con un sentinel que no existe en el input real:
+    super_regex, token_names = build_super_regex(alternatives)
 
     with open(output_path, 'w', encoding='utf-8') as f:
         # --- Cabecera del usuario ---
@@ -21,8 +23,6 @@ def generate_lexer_py(yal_info: dict, output_path: str):
         f.write(f"token_names = {token_names!r}\n")
         f.write(f"super_regex = {super_regex!r}\n\n")
 
-        
-        
         # --- Importaciones internas ---
         f.write("from chain_compiler.normalizer import normalize_regex\n")
         f.write("from chain_compiler.parser     import parse_tokens\n")
@@ -37,15 +37,17 @@ def generate_lexer_py(yal_info: dict, output_path: str):
         f.write("dfa          = afd_service.build_dfa_from_ast(ast, token_names)\n")
         f.write("afd_service.minimize_dfa()\n\n")
 
-        # --- entrypoint con filtrado y sentinel '#' para delimitar el fin de token ---
+        # --- Definimos el mismo sentinel en el .py generado ---
+        f.write(f"SENTINEL = {DEFAULT_SENTINEL!r}\n\n")
+
+        # --- entrypoint con filtrado y sentinel fijo para el fin de token ---
         f.write("def entrypoint(buffer: str):\n")
         f.write("    \"\"\"Escanea el buffer y devuelve lista de (token, lexeme),\n")
-        f.write("       descartando espacios y comentarios. Añade '#' al final como sentinel.\"\"\"\n")
-        f.write("    # agregamos '#' para que cada patrón dispare su marcador de token al terminar\n")
-        f.write("    tokens = afd_service.scan_input(buffer + '#')\n")  # aquí buffer + '#' coincide con el sentinel
-        f.write("    return [(tok,lex) for tok,lex in tokens\n")
+        f.write("       descartando espacios y comentarios.\"\"\"\n")
+        f.write("    # agregamos el sentinel para delimitar el final\n")
+        f.write("    tokens = afd_service.scan_input(buffer + SENTINEL)\n")
+        f.write("    return [(tok, lex) for tok, lex in tokens\n")
         f.write("            if tok not in ('WHITESPACE','COMMENT')]\n\n")
-        
 
         # --- Trailer del usuario ---
         if trailer:
@@ -57,5 +59,5 @@ def generate_lexer_py(yal_info: dict, output_path: str):
         f.write("if __name__ == '__main__':\n")
         f.write("    import sys\n")
         f.write("    data = sys.stdin.read()\n")
-        f.write("    for tok,lex in entrypoint(data):\n")
+        f.write("    for tok, lex in entrypoint(data):\n")
         f.write("        print(tok, lex)\n")
