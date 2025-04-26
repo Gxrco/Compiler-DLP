@@ -5,16 +5,16 @@ import re
 def clean_regex_part(regex):
     """
     Limpia y escapa correctamente una parte de expresión regular.
-    - Reemplaza caracteres reales '\n', '\r', '\t' por sus secuencias literales.
-    - Maneja literales entre comillas, clases y metacaracteres.
+    - Convierte saltos reales a '\n', '\r', '\t'.
+    - Maneja literales y clases de caracteres.
     """
-    # 0) Convertir caracteres reales a secuencias
+    # 0) Normalizar escapes de línea
     regex = regex.replace('\n', r'\n').replace('\r', r'\r').replace('\t', r'\t')
     regex = regex.strip()
 
     metachar = r'{}[]().*+?^$|\\'
 
-    # 1) Literales "..." o '...' con posible resto
+    # 1) Literales al principio
     if regex and regex[0] in "\"'":
         quote = regex[0]
         end = regex.find(quote, 1)
@@ -23,7 +23,7 @@ def clean_regex_part(regex):
             rest = regex[end+1:]
             return re.escape(literal) + rest
 
-    # 2) Clase de caracteres al inicio, con posible resto
+    # 2) Clase de caracteres al principio
     if regex.startswith('['):
         close = regex.find(']')
         if close != -1:
@@ -35,7 +35,7 @@ def clean_regex_part(regex):
     if len(regex) == 1 and regex in metachar:
         return '\\' + regex
 
-    # 4) Escapar metacaracteres individuales
+    # 4) Escapar resto de metacaracteres
     result = ''
     i = 0
     while i < len(regex):
@@ -50,32 +50,13 @@ def clean_regex_part(regex):
             result += c
             i += 1
 
-    # 5) Asegurar que no haya saltos de línea residuales
-    return result.replace('\n', r'\n').replace('\r', r'\r')
+    return result
 
-def remove_space_outside_classes(s: str) -> str:
+def build_super_regex(rules, sentinel='␦'):
     """
-    Elimina espacios que no estén dentro de clases de caracteres '[...]'.
-    """
-    out = []
-    in_cls = False
-    for ch in s:
-        if ch == '[':
-            in_cls = True
-            out.append(ch)
-        elif ch == ']':
-            in_cls = False
-            out.append(ch)
-        elif ch == ' ' and not in_cls:
-            # omitimos espacio fuera de clase
-            continue
-        else:
-            out.append(ch)
-    return ''.join(out)
-
-def build_super_regex(rules):
-    """
-    Como antes, pero cada patrón ya viene sin líneas.
+    Construye la super-regex concatenando cada patrón y su marcador,
+    y añade el sentinel como alternativa separada.
+    Devuelve (super_regex, token_names).
     """
     parts = []
     token_names = []
@@ -83,9 +64,9 @@ def build_super_regex(rules):
     for idx, (raw_regex, action) in enumerate(rules):
         pattern = raw_regex.strip()
         regex_clean = clean_regex_part(pattern)
-        regex_clean = remove_space_outside_classes(regex_clean)
+        regex_clean = re.sub(r'\s+', ' ', regex_clean)
 
-        # Extraer nombre de token
+        # extraer nombre de token
         m = re.search(r'return\s+([A-Za-z_]\w*)', action)
         if m:
             token = m.group(1)
@@ -98,6 +79,9 @@ def build_super_regex(rules):
         marker = chr(1 + idx)
         parts.append(f"({regex_clean}){marker}")
 
+    # añadir sentinel como última alternativa
+    parts.append(f"({sentinel})")
     super_regex = "|".join(parts)
+
     print(f"Super-regex construido: {super_regex}")
     return super_regex, token_names

@@ -10,20 +10,19 @@ def generate_lexer_py(yal_info: dict, output_path: str):
     trailer      = yal_info.get('trailer', '').strip()
     alternatives = yal_info.get('alternatives', [])
 
-    # 1) Construir super-regex **y** token_names
     super_regex, token_names = build_super_regex(alternatives)
-    # Quitar saltos de línea reales y reemplazarlos por '\n' literales
-    super_regex = super_regex.replace('\r', '').replace('\n', r'\n')
 
     with open(output_path, 'w', encoding='utf-8') as f:
         # --- Cabecera del usuario ---
         if header:
             f.write(header + "\n\n")
 
-        # --- Definir token_names y super_regex ---
+        # --- Cabecera del lexer: nombres y regex serializados con repr() ---
         f.write(f"token_names = {token_names!r}\n")
-        f.write(f"super_regex = r'''{super_regex}'''\n\n")
+        f.write(f"super_regex = {super_regex!r}\n\n")
 
+        
+        
         # --- Importaciones internas ---
         f.write("from chain_compiler.normalizer import normalize_regex\n")
         f.write("from chain_compiler.parser     import parse_tokens\n")
@@ -38,13 +37,15 @@ def generate_lexer_py(yal_info: dict, output_path: str):
         f.write("dfa          = afd_service.build_dfa_from_ast(ast, token_names)\n")
         f.write("afd_service.minimize_dfa()\n\n")
 
-        # --- entrypoint con filtrado ---
+        # --- entrypoint con filtrado y sentinel '#' para delimitar el fin de token ---
         f.write("def entrypoint(buffer: str):\n")
         f.write("    \"\"\"Escanea el buffer y devuelve lista de (token, lexeme),\n")
-        f.write("       descartando espacios y comentarios.\"\"\"\n")
-        f.write("    tokens = afd_service.scan_input(buffer)\n")
+        f.write("       descartando espacios y comentarios. Añade '#' al final como sentinel.\"\"\"\n")
+        f.write("    # agregamos '#' para que cada patrón dispare su marcador de token al terminar\n")
+        f.write("    tokens = afd_service.scan_input(buffer + '#')\n")
         f.write("    return [(tok,lex) for tok,lex in tokens\n")
         f.write("            if tok not in ('WHITESPACE','COMMENT')]\n\n")
+        
 
         # --- Trailer del usuario ---
         if trailer:
