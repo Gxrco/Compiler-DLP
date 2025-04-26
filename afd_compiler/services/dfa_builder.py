@@ -31,7 +31,7 @@ def build_direct_dfa(ast, token_names):
     followpos = calculate_followpos(ast)
 
     # 4) Construir alfabeto real (excluyendo códigos de control < chr(32))
-    alphabet = {c for c in get_alphabet(ast) if ord(c) >= 32}
+    alphabet = set(get_alphabet(ast))
 
     # 5) Estado inicial
     initial_state = frozenset(ast.firstpos)

@@ -10,8 +10,9 @@ from afd_compiler.service                  import AFDService
 # Paso 1: Parsear .yal y construir super-regex
 info = parse_yal_file("ejemplo3.yal")
 alts = info["alternatives"]
-print("⎯⎯ Alternatives:", alts)
+print("Alternativas detectadas:", [pat for pat,_ in alts])
 super_regex, token_names = build_super_regex(alts)
+print("Token names:", token_names)
 print("⎯⎯ Token names:", token_names)
 print("⎯⎯ Super-regex:", super_regex, "\n")
 

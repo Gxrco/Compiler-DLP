@@ -79,17 +79,19 @@ def parse_yal_file(filepath):
 
     def split_unescaped(text):
         parts, cur = [], ""
-        in_class = esc = False
+        in_class = in_quote = esc = False
         for ch in text:
             if esc:
                 cur += ch; esc = False
             elif ch == "\\":
                 cur += ch; esc = True
-            elif ch == "[":
+            elif ch == '"' and not in_class:
+                cur += ch; in_quote = not in_quote
+            elif ch == "[" and not in_quote:
                 cur += ch; in_class = True
             elif ch == "]" and in_class:
                 cur += ch; in_class = False
-            elif ch == "|" and not in_class:
+            elif ch == "|" and not in_class and not in_quote:
                 parts.append(cur.strip()); cur = ""
             else:
                 cur += ch

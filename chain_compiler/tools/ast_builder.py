@@ -4,39 +4,42 @@ from chain_compiler.model.operator import OPERATORS
 from string import printable
 
 def expand_char_class(token):
-    """
-    Expande una clase de caracteres en un AST de unión.
-    Soporta clases normales y clases negadas ([^...]).
-
-    Args:
-        token (Token): Token con valor "[a-z]" o "[^abc]"
-
-    Returns:
-        ASTNode: AST que representa la unión (|) de todos los caracteres permitidos
-    """
-    content = token.value[1:-1]
+    content = token.value[1:-1]              # e.g. "^\\n" o "\\t0-9]"
     is_negated = content.startswith('^')
     if is_negated:
         content = content[1:]
 
+    from string import printable
     char_set = set()
     i = 0
     while i < len(content):
-        if i + 2 < len(content) and content[i+1] == '-':
-            start = content[i]
-            end = content[i+2]
+        # 1) Si es una secuencia de escape \n, \t, \r, \\…
+        if content[i] == '\\' and i+1 < len(content):
+            esc = content[i+1]
+            if esc == 'n':
+                char_set.add('\n')
+            elif esc == 't':
+                char_set.add('\t')
+            elif esc == 'r':
+                char_set.add('\r')
+            else:
+                char_set.add(esc)
+            i += 2
+
+        # 2) Un rango a-b
+        elif i+2 < len(content) and content[i+1] == '-':
+            start, end = content[i], content[i+2]
             for c in range(ord(start), ord(end)+1):
                 char_set.add(chr(c))
             i += 3
+
+        # 3) Carácter suelto
         else:
             char_set.add(content[i])
             i += 1
 
-    if not char_set:
-        raise ValueError("Clase de caracteres vacía")
-
     if is_negated:
-        all_chars = set(printable) 
+        all_chars = set(printable)
         char_set = all_chars - char_set
 
     # Convertimos el set final a AST de unión
