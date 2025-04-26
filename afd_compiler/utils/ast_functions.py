@@ -76,7 +76,7 @@ def calculate_followpos(node, followpos=None):
 def get_alphabet(node, alphabet=None):
     if alphabet is None:
         alphabet = set()
-    if node.type == 'CHAR' and ord(node.value) >= 32:
+    if node.type == 'CHAR':
         alphabet.add(node.value)
     for child in node.children:
         get_alphabet(child, alphabet)
