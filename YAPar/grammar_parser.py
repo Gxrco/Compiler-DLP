@@ -1,83 +1,74 @@
 # YAPar/grammar_parser.py
 
 import re
-from YAPar.grammar_ast import Grammar, Production
-from typing import List, Tuple
+from typing import List
+from .grammar_ast import Grammar, Production
 
-def remove_comments(text: str) -> str:
-    """
-    Elimina todos los comentarios delimitados por /* ... */ (multilínea).
-    """
-    pattern = re.compile(r'/\*.*?\*/', re.DOTALL)
-    return re.sub(pattern, '', text)
-
-def split_sections(text: str) -> Tuple[List[str], List[str]]:
-    """
-    Divide el archivo en dos listas de líneas, cortando en la línea que contiene '%%'.
-    Devuelve (lines_tokens_section, lines_productions_section).
-    """
-    lines = text.splitlines()
-    try:
-        idx = next(i for i, l in enumerate(lines) if l.strip() == '%%')
-    except StopIteration:
-        raise ValueError("No se encontró la línea '%%' para separar secciones")
-    tokens_sec = lines[:idx]
-    prods_sec  = lines[idx+1:]
-    return tokens_sec, prods_sec
-
-def parse_tokens_section(lines: List[str]) -> Tuple[List[str], List[str]]:
-    """
-    De una lista de líneas de la sección de tokens:
-      - extrae todos los identificadores tras '%token'
-      - extrae la lista tras 'IGNORE'
-    devuelve (tokens, ignore_list)
-    """
-    tokens = []
-    ignore = []
-    for raw in lines:
-        line = raw.strip()
-        if not line:
-            continue
-        parts = line.split()
-        if parts[0] == '%token':
-            tokens += parts[1:]
-        elif parts[0] == 'IGNORE':
-            ignore += parts[1:]
-    return tokens, ignore
-
-def parse_productions_section(lines: List[str]) -> List[Production]:
-    """
-    De una lista de líneas de producciones construye la lista de Production.
-    Cada producción termina en ';'. Se agrupan líneas entre ':' y ';'.
-    """
-    prods: List[Production] = []
-    buffer = []
-    for raw in lines:
-        line = raw.strip()
-        if not line:
-            continue
-        buffer.append(line)
-        if line.endswith(';'):
-            # unir buffer y parsear
-            block = " ".join(buffer)[:-1]  # quita el ';'
-            buffer.clear()
-            # lhs: antes de ':'
-            if ':' not in block:
-                raise ValueError(f"Producción inválida (falta ':'): {block}")
-            lhs, rhs = block.split(':', 1)
-            lhs = lhs.strip()
-            # cada alternativa separada por '|'
-            alts = [alt.strip().split() for alt in rhs.split('|')]
-            prods.append(Production(lhs, alts))
-    return prods
+TOKEN_RE   = re.compile(r'^\s*%token\s+(.+)$')
+IGNORE_RE  = re.compile(r'^\s*IGNORE\s+(.+)$')
+SEP_RE     = re.compile(r'^\s*%%\s*$')
+PROD_HEAD  = re.compile(r'^\s*(\w+)\s*:\s*(.*)$')
+ALT_SPLIT  = re.compile(r'\s*\|\s*')
+END_PROD   = re.compile(r';\s*$')
 
 def parse_file(path: str) -> Grammar:
-    """
-    Lee un archivo .yalp, parsea y devuelve una instancia de Grammar.
-    """
-    text = open(path, encoding='utf-8').read()
-    text_noc = remove_comments(text)
-    tok_lines, prod_lines = split_sections(text_noc)
-    tokens, ignore = parse_tokens_section(tok_lines)
-    prods = parse_productions_section(prod_lines)
-    return Grammar(tokens, ignore, prods)
+    tokens: List[str] = []
+    ignore: List[str] = []
+    productions: List[Production] = []
+
+    with open(path, encoding='utf-8') as f:
+        lines = f.read().splitlines()
+
+    phase = 'tokens'  # fases: tokens, prods
+    i = 0
+    # ——— Sección de TOKENS / IGNORE ———
+    while i < len(lines):
+        line = lines[i].strip()
+        if SEP_RE.match(line):
+            phase = 'prods'
+            i += 1
+            break
+
+        m_tok = TOKEN_RE.match(line)
+        m_ign = IGNORE_RE.match(line)
+        if m_tok:
+            # extraer todos los tokens separados por espacio
+            tokens += m_tok.group(1).split()
+        elif m_ign:
+            ignore += m_ign.group(1).split()
+        # else: comentario o vacío → ignorar
+        i += 1
+
+    # ——— Sección de PRODUCCIONES ———
+    while i < len(lines):
+        line = lines[i].strip()
+        if not line or line.startswith('/*'):
+            i += 1
+            continue
+
+        # producción puede abarcar varias líneas hasta ;
+        prod_lines = []
+        while i < len(lines):
+            prod_lines.append(lines[i].strip())
+            if END_PROD.search(lines[i]):
+                break
+            i += 1
+        prod_text = " ".join(prod_lines)
+        i += 1
+
+        # extraer nombre y RHS completo (sin ;)
+        m_head = PROD_HEAD.match(prod_text)
+        if not m_head:
+            continue
+        lhs = m_head.group(1)
+        rhs_all = m_head.group(2).rstrip(';').strip()
+
+        # dividir alternativas
+        alts = ALT_SPLIT.split(rhs_all)
+        rhs_list = []
+        for alt in alts:
+            symbols = [tok for tok in alt.split() if tok]
+            rhs_list.append(symbols)
+        productions.append(Production(lhs=lhs, rhs=rhs_list))
+
+    return Grammar(tokens=tokens, ignore=ignore, productions=productions)

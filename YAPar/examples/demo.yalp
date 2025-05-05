@@ -1,0 +1,16 @@
+/* demo.yalp */
+%token IF ELSE ID WS
+IGNORE WS
+%%
+expression:
+    expression PLUS term
+  | term
+;
+term:
+    term TIMES factor
+  | factor
+;
+factor:
+    ID
+  | IF
+;
