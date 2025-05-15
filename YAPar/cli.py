@@ -2,45 +2,45 @@
 
 import argparse
 import sys
-from YAPar.grammar_parser       import parse_file
-from YAPar.utils.first_follow   import compute_first, compute_follow
-from YAPar.lr0_builder          import build_lr0_states
-from YAPar.slr_table_generator  import build_slr_parsing_table
-from YAPar.parse_engine         import parse_tokens, ParseError
+from YAPar.grammar_parser      import parse_file
+from YAPar.utils.first_follow  import compute_first, compute_follow
+from YAPar.lr0_builder         import build_lr0_states
+from YAPar.slr_table_generator import build_slr_parsing_table
+from YAPar.parse_engine        import parse_tokens, ParseError
+from YAPar.errors              import CLIError, GrammarError, GenerationError
 
 def main():
     parser = argparse.ArgumentParser(
         prog="yapar",
         description="YAPar CLI: genera y prueba un parser SLR(1) desde una gramática .yalp"
     )
-    parser.add_argument(
-        "grammar",
-        help="Ruta al archivo de gramática (.yalp)"
-    )
-    parser.add_argument(
-        "-l", "--lexer",
-        dest="lexer",
-        help="Archivo de lexer generado por YALex (no usado actualmente)"
-    )
-    parser.add_argument(
-        "-o", "--output",
-        dest="output",
-        required=True,
-        help="Nombre del archivo Python de salida para el parser"
-    )
-    parser.add_argument(
-        "--test",
-        dest="test_input",
-        help="Archivo con tokens de prueba (uno o más tokens separados por espacio o línea)"
-    )
+    parser.add_argument("grammar", help="Ruta al archivo de gramática (.yalp)")
+    parser.add_argument("-l", "--lexer", dest="lexer",
+                        help="Archivo de lexer generado por YALex (no usado actualmente)")
+    parser.add_argument("-o", "--output", dest="output", required=True,
+                        help="Nombre del archivo Python de salida para el parser")
+    parser.add_argument("--test", dest="test_input",
+                        help="Archivo con tokens de prueba (tokens separados por espacio)")
 
-    args = parser.parse_args()
+    # Permitir --help sin convertirlo en CLIError
+    try:
+        args = parser.parse_args()
+    except SystemExit as e:
+        if e.code != 0:
+            raise CLIError("Error en los argumentos de la línea de comandos")
+        else:
+            sys.exit(0)
 
     # 1) Parsear gramática
-    grammar = parse_file(args.grammar)
+    try:
+        grammar = parse_file(args.grammar)
+    except GrammarError as e:
+        print(f"Error de gramática: {e}", file=sys.stderr)
+        sys.exit(1)
+
     print(f"Cargando gramática desde {args.grammar}")
-    print(f"Tokens: {grammar.tokens}")
-    print(f"Nonterminals: {[p.lhs for p in grammar.productions]}")
+    print(f"Tokens declarados: {grammar.tokens}")
+    print(f"No-terminales: {[p.lhs for p in grammar.productions]}")
 
     # 2) FIRST / FOLLOW
     first  = compute_first(grammar)
@@ -56,7 +56,11 @@ def main():
     print(f"{len(states)} estados LR(0) generados")
 
     # 4) Tablas SLR(1)
-    _, action_tbl, goto_tbl = build_slr_parsing_table(args.grammar)
+    try:
+        _, action_tbl, goto_tbl = build_slr_parsing_table(args.grammar)
+    except Exception as e:
+        print(f"Error al generar tablas SLR(1): {e}", file=sys.stderr)
+        sys.exit(1)
     print(f"Tabla ACTION con {len(action_tbl)} entradas")
     print(f"Tabla GOTO con {len(goto_tbl)} entradas")
 
@@ -95,12 +99,16 @@ def main():
             out.write("    import sys\n")
             out.write("    data = sys.stdin.read().split()\n")
             out.write("    result = parse(data)\n")
-            out.write("    for s,a in result:\n")
+            out.write("    for s, a in result:\n")
             out.write("        print(s, a)\n")
         print(f"Parser generado en {args.output}")
-    except IOError as e:
+    except OSError as e:
         print(f"Error al escribir el parser: {e}", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except CLIError as e:
+        print(f"CLI error: {e}", file=sys.stderr)
+        sys.exit(1)

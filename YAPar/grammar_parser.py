@@ -3,6 +3,7 @@
 import re
 from typing import List
 from .grammar_ast import Grammar, Production
+from YAPar.errors import GrammarError
 
 TOKEN_RE   = re.compile(r'^\s*%token\s+(.+)$')
 IGNORE_RE  = re.compile(r'^\s*IGNORE\s+(.+)$')
@@ -12,16 +13,24 @@ ALT_SPLIT  = re.compile(r'\s*\|\s*')
 END_PROD   = re.compile(r';\s*$')
 
 def parse_file(path: str) -> Grammar:
+    """
+    Lee y parsea una gramática YAPar (.yalp), devolviendo un objeto Grammar.
+    Lanza GrammarError si falla la lectura o la sintaxis.
+    """
     tokens: List[str] = []
     ignore: List[str] = []
     productions: List[Production] = []
 
-    with open(path, encoding='utf-8') as f:
-        lines = f.read().splitlines()
+    # 1) Leer el archivo
+    try:
+        with open(path, encoding='utf-8') as f:
+            lines = f.read().splitlines()
+    except OSError as e:
+        raise GrammarError(f"No se puede leer el archivo de gramática '{path}': {e}")
 
-    phase = 'tokens'  # fases: tokens, prods
+    # 2) Fase de tokens y ignore
+    phase = 'tokens'
     i = 0
-    # ——— Sección de TOKENS / IGNORE ———
     while i < len(lines):
         line = lines[i].strip()
         if SEP_RE.match(line):
@@ -32,21 +41,20 @@ def parse_file(path: str) -> Grammar:
         m_tok = TOKEN_RE.match(line)
         m_ign = IGNORE_RE.match(line)
         if m_tok:
-            # extraer todos los tokens separados por espacio
             tokens += m_tok.group(1).split()
         elif m_ign:
             ignore += m_ign.group(1).split()
-        # else: comentario o vacío → ignorar
+        # líneas vacías o comentarios se ignoran
         i += 1
 
-    # ——— Sección de PRODUCCIONES ———
+    # 3) Fase de producciones
     while i < len(lines):
-        line = lines[i].strip()
-        if not line or line.startswith('/*'):
+        raw = lines[i].strip()
+        if not raw or raw.startswith('/*'):
             i += 1
             continue
 
-        # producción puede abarcar varias líneas hasta ;
+        # Acumular líneas hasta encontrar ';'
         prod_lines = []
         while i < len(lines):
             prod_lines.append(lines[i].strip())
@@ -56,19 +64,29 @@ def parse_file(path: str) -> Grammar:
         prod_text = " ".join(prod_lines)
         i += 1
 
-        # extraer nombre y RHS completo (sin ;)
+        # Extraer lhs y rhs
         m_head = PROD_HEAD.match(prod_text)
         if not m_head:
-            continue
+            # Si no coincide el patrón, es sintaxis inválida
+            raise GrammarError(f"Línea de producción inválida: '{prod_text}'")
         lhs = m_head.group(1)
         rhs_all = m_head.group(2).rstrip(';').strip()
 
-        # dividir alternativas
-        alts = ALT_SPLIT.split(rhs_all)
-        rhs_list = []
-        for alt in alts:
-            symbols = [tok for tok in alt.split() if tok]
-            rhs_list.append(symbols)
+        # Dividir alternativas por '|'
+        parts = ALT_SPLIT.split(rhs_all)
+        rhs_list: List[List[str]] = []
+        for part in parts:
+            symbols = [tok for tok in part.strip().split() if tok]
+            if not symbols:
+                # Producción vacía (ε)
+                rhs_list.append([])
+            else:
+                rhs_list.append(symbols)
+
         productions.append(Production(lhs=lhs, rhs=rhs_list))
 
-    return Grammar(tokens=tokens, ignore=ignore, productions=productions)
+    # 4) Construir y devolver la Grammar
+    try:
+        return Grammar(tokens=tokens, ignore=ignore, productions=productions)
+    except Exception as e:
+        raise GrammarError(f"Error al construir el objeto Grammar: {e}")
