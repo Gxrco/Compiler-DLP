@@ -4,9 +4,15 @@ from typing import List, NamedTuple
 
 class Production(NamedTuple):
     lhs: str
-    rhs: List[List[str]]
+    rhs: List[List[str]]  # cada RHS es una lista de símbolos (tokens o no-terminales)
 
 class Grammar:
+    """
+    Representa una gramática YAPar completamente parseada.
+    - tokens: lista de nombres de token (terminales)
+    - ignore: lista de tokens a ignorar
+    - productions: lista de Production
+    """
     def __init__(self,
                  tokens: List[str],
                  ignore: List[str],
@@ -15,11 +21,10 @@ class Grammar:
         self.ignore = ignore
         self.productions = productions
 
-        # — Atributos extra para FIRST/FOLLOW tests —
+        # Atributos adicionales para FIRST/FOLLOW y parser
         self.start_symbol = productions[0].lhs if productions else None
         self.terminals    = [t for t in tokens if t not in ignore]
         self.eof_token    = '$'
-        # ——————————————————————————————
 
     def __repr__(self):
         lines = ["Grammar:",
