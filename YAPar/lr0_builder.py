@@ -10,31 +10,40 @@ def build_lr0_states(
 ) -> List[Set[Item]]:
     """
     Construye la colección canónica C de conjuntos de ítems LR(0):
-      1. Estado 0 = closure({S'→•α}), donde α es la RHS de la producción augmentada.
-      2. Para cada estado I en C y cada símbolo X en la gramática:
-           si GOTO(I, X) ≠ ∅ y aún no está en C, añadirlo a C.
-    Retorna la lista de estados (cada uno es un Set[Item]).
+      1. Estado 0 = closure({S'→•α})
+      2. Para cada estado I y cada símbolo X (no-terminal o terminal):
+           si GOTO(I, X) ≠ ∅ y no está en C, añadirlo.
+    Retorna la lista de estados (cada uno es un Set[Item]) en orden de descubrimiento.
     """
-    # 1) Ítem inicial a partir de la primera producción (la augmentada)
-    #    productions[0] debe ser (start_symbol, [[original_start]])
-    augment_lhs, augment_rhss = productions[0]
-    # Tomamos la primera alternativa de RHS
-    initial_rhs = augment_rhss[0]
-    I0 = closure({ Item(lhs=augment_lhs, rhs=initial_rhs, dot=0) }, productions)
+    # 1) Ítem inicial de la producción augmentada (siempre productions[0])
+    aug_lhs, aug_rhss = productions[0]
+    initial_rhs      = aug_rhss[0]
+    I0 = closure({ Item(lhs=aug_lhs, rhs=initial_rhs, dot=0) }, productions)
 
     states: List[Set[Item]] = [I0]
-    # Recopilar todos los símbolos (terminales y no-terminales)
-    symbols = set()
-    for lhs, rhss in productions:
-        symbols.add(lhs)
-        for rhs in rhss:
-            symbols.update(rhs)
 
-    # 2) Construir la colección canónica
+    # 2) Determinar orden de símbolos: primero no-terminales (LHS en orden),
+    #    luego terminales (aquellos símbolos que aparecen en RHS pero no son LHS),
+    #    preservando su primer aparición.
+    nonterms = [lhs for (lhs, _) in productions]
+
+    seen = set()
+    symbols_rhs = []
+    for _, rhss in productions:
+        for rhs in rhss:
+            for sym in rhs:
+                if sym not in seen:
+                    seen.add(sym)
+                    symbols_rhs.append(sym)
+
+    terminals = [s for s in symbols_rhs if s not in nonterms]
+    ordered_symbols = nonterms + terminals
+
+    # 3) Generar la colección canónica
     idx = 0
     while idx < len(states):
         I = states[idx]
-        for X in symbols:
+        for X in ordered_symbols:
             J = goto(I, X, productions)
             if J and J not in states:
                 states.append(J)
