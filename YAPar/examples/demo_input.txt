@@ -1,0 +1,24 @@
+# Este es un archivo de prueba para nuestro compilador
+
+# Expresiones matemáticas simples
+x = 5 + 3;
+result = (10 - 2) * 4;
+
+# Expresión con anidamiento
+total = (a + b) * (c - d);
+
+# Sentencia if
+if (x > 0):
+{
+    y = x + 1;
+}
+
+# Sentencia while
+while (count != 0):
+{
+    sum = sum + count;
+    count = count - 1;
+}
+
+# Expresión con indexación
+array[index] = value;
