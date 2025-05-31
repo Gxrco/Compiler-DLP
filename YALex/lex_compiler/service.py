@@ -1,4 +1,4 @@
-# lex_compiler/service.py
+# YALEX/lex_compiler/service.py
 
 from chain_compiler.tools.super_regex_builder import build_super_regex, DEFAULT_SENTINEL
 
@@ -43,11 +43,12 @@ def generate_lexer_py(yal_info: dict, output_path: str):
         # --- entrypoint con filtrado y sentinel fijo para el fin de token ---
         f.write("def entrypoint(buffer: str):\n")
         f.write("    \"\"\"Escanea el buffer y devuelve lista de (token, lexeme),\n")
-        f.write("       descartando espacios y comentarios.\"\"\"\n")
+        f.write("       descartando espacios, comentarios y errores léxicos.\"\"\"\n")
         f.write("    # agregamos el sentinel para delimitar el final\n")
         f.write("    tokens = afd_service.scan_input(buffer + SENTINEL)\n")
+        # <<--- Aquí se añade 'ERROR' a la lista de tokens a filtrar --->
         f.write("    return [(tok, lex) for tok, lex in tokens\n")
-        f.write("            if tok not in ('WHITESPACE','COMMENT')]\n\n")
+        f.write("            if tok not in ('WHITESPACE','COMMENT','ERROR')]\n\n")
 
         # --- Trailer del usuario ---
         if trailer:

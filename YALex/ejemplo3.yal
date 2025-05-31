@@ -1,33 +1,33 @@
 (* ejemplo.yal *)
 
 rule tokens =
-  "#"[^\n]* { return COMMENT }
-| "if" { return IF }
-| "else" { return ELSE }
-| "while" { return WHILE }
-| "==" { return EQUALS }
-| "!=" { return NOTEQUAL }
-| ">=" { return GREATEREQ }
-| "<=" { return LESSEQ }
-| "<" { return LESS }
-| ">" { return GREATER }
-| "+" { return PLUS }
-| "-" { return MINUS }
-| "*" { return TIMES }
-| "/" { return DIVIDE }
-| "(" { return LPAREN }
-| ")" { return RPAREN }
-| "[" { return LBRACKET }
-| "]" { return RBRACKET }
-| "{" { return LBRACE }
-| "}" { return RBRACE }
-| ":" { return COLON }
-| ";" { return SEMICOLON }
-| "=" { return ASSIGN }
-| "," { return COMMA }
-| [a-zA-Z][a-zA-Z0-9]* { return ID }
-| [0-9]+ { return NUMBER }
-| [ \t\n\r] { return WHITESPACE }
+"#"[^\n]*             { return COMMENT }
+|"if"                  { return IF }
+|"else"                { return ELSE }
+|"while"               { return WHILE }
+|"=="                  { return EQUALS }
+|"!="                  { return NOTEQUAL }
+|">="                  { return GREATEREQ }
+|"<="                  { return LESSEQ }
+|"<"                   { return LESS }
+|">"                   { return GREATER }
+|"+"                   { return PLUS }
+|"-"                   { return MINUS }
+|"*"                   { return TIMES }
+|"/"                   { return DIVIDE }
+|"("                   { return LPAREN }
+|")"                   { return RPAREN }
+|"["                   { return LBRACKET }
+|"]"                   { return RBRACKET }
+|"{"                   { return LBRACE }
+|"}"                   { return RBRACE }
+|":"                   { return COLON }
+|";"                   { return SEMICOLON }
+|"="                   { return ASSIGN }
+|","                   { return COMMA }
+|[a-zA-Z][a-zA-Z0-9]*  { return ID }
+|[0-9]+                { return NUMBER }
+|[ \t\n\r]             { return WHITESPACE }
 
 {
 def process_token(token, lexeme):

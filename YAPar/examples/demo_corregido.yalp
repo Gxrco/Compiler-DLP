@@ -1,0 +1,49 @@
+/* demo_corregido.yalp */
+
+/* 1) Declaración de todos los tokens que el lexer produce */
+%token IF ELSE WHILE 
+       EQUALS NOTEQUAL GREATEREQ LESSEQ LESS GREATER 
+       PLUS MINUS TIMES DIVIDE 
+       LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE 
+       COLON SEMICOLON ASSIGN COMMA 
+       ID NUMBER
+
+/* 2) El parser debe IGNORAR WHITESPACE y COMMENT (tal como los filtra el lexer) */
+IGNORE WHITESPACE COMMENT
+
+%%
+program:
+    stmt_list
+;
+
+stmt_list:
+    stmt_list stmt
+  | stmt
+;
+
+stmt:
+    ID ASSIGN expr SEMICOLON
+  | LBRACE stmt_list RBRACE
+  | IF LPAREN expr RPAREN stmt
+  | IF LPAREN expr RPAREN stmt ELSE stmt
+  | WHILE LPAREN expr RPAREN stmt
+;
+
+expr:
+    expr PLUS term
+  | expr MINUS term
+  | term
+;
+
+term:
+    term TIMES factor
+  | term DIVIDE factor
+  | factor
+;
+
+factor:
+    LPAREN expr RPAREN
+  | ID
+  | NUMBER
+  | ID LBRACKET expr RBRACKET
+;

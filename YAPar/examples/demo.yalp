@@ -1,16 +1,56 @@
-/* demo.yalp */
-%token IF ELSE ID WS
-IGNORE WS
+/* demo_corregido.yalp */
+
+/* 1) Declaración de todos los tokens posibles (coinciden exactamente con los return XXX del lexer) */
+%token IF ELSE WHILE EQUALS NOTEQUAL GREATEREQ LESSEQ LESS GREATER PLUS MINUS TIMES DIVIDE
+%token LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE COLON SEMICOLON ASSIGN COMMA
+%token ID NUMBER
+
+/* 2) Ignorar espacios (el lexer devolvía WHITESPACE) y comentarios (lexer devolvía COMMENT) */
+IGNORE WHITESPACE COMMENT
+
 %%
-expression:
-    expression PLUS term
-  | term
-;
+
+/* 3) Definición de la gramática (en un dialecto C‐like muy simplificado) */
+
+program:
+      stmt_list
+    ;
+
+stmt_list:
+      /* una o más sentencias */
+      stmt_list stmt
+    | stmt
+    ;
+
+stmt:
+      /* Asignación simple: ID = expr; */
+      ID ASSIGN expr SEMICOLON
+    | /* Bloque: { stmt_list } */
+      LBRACE stmt_list RBRACE
+    | /* If: if ( expr ) stmt */
+      IF LPAREN expr RPAREN stmt
+    | /* If‐else: if ( expr ) stmt else stmt */
+      IF LPAREN expr RPAREN stmt ELSE stmt
+    | /* While: while ( expr ) stmt */
+      WHILE LPAREN expr RPAREN stmt
+    ;
+
+expr:
+      expr PLUS term
+    | expr MINUS term
+    | term
+    ;
+
 term:
-    term TIMES factor
-  | factor
-;
+      term TIMES factor
+    | term DIVIDE factor
+    | factor
+    ;
+
 factor:
-    ID
-  | IF
-;
+      /* Paréntesis o variable/constante o acceso a array */
+      LPAREN expr RPAREN
+    | ID
+    | NUMBER
+    | ID LBRACKET expr RBRACKET    /* indexación: ID [ expr ] */
+    ;
