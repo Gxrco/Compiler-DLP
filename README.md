@@ -88,6 +88,11 @@ Compiler-DLP/
 └── test_lexer_parser.py          # Tests de integración
 ```
 
+### Orquestación de servicios (YALex/YAPar)
+![image](https://github.com/user-attachments/assets/c17049cc-9fbe-4014-ac31-201d2fe66680)
+
+
+
 ## YALex: Generador de Analizadores Léxicos
 
 ### Características Principales
