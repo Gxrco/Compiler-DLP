@@ -1,5 +1,5 @@
-token_names = ['COMMENT', 'IF', 'ELSE', 'WHILE', 'EQUALS', 'NOTEQUAL', 'GREATEREQ', 'LESSEQ', 'LESS', 'GREATER', 'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'LPAREN', 'RPAREN', 'LBRACKET', 'RBRACKET', 'LBRACE', 'RBRACE', 'COLON', 'SEMICOLON', 'ASSIGN', 'COMMA', 'ID', 'NUMBER', 'WHITESPACE']
-super_regex = '(\\#[^\\n]*)\x01|(if)\x02|(else)\x03|(while)\x04|(==)\x05|(!=)\x06|(>=)\x07|(<=)\x08|(<)\t|(>)\n|(\\+)\x0b|(\\-)\x0c|(\\*)\r|(/)\x0e|(\\()\x0f|(\\))\x10|(\\[)\x11|(\\])\x12|(\\{)\x13|(\\})\x14|(:)\x15|(;)\x16|(=)\x17|(,)\x18|([a-zA-Z][a-zA-Z0-9]*)\x19|([0-9]+)\x1a|([ \\t\\n\\r])\x1b|(\x00)'
+token_names = ['COMMENT', 'IF', 'ELSE', 'WHILE', 'EQUALS', 'NOTEQUAL', 'GREATEREQ', 'LESSEQ', 'LESS', 'GREATER', 'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'LPAREN', 'RPAREN', 'LBRACKET', 'RBRACKET', 'LBRACE', 'RBRACE', 'COLON', 'SEMICOLON', 'ASSIGN', 'COMMA', 'ID', 'NUMBER', 'WHITESPACE', 'WHITESPACE', 'WHITESPACE']
+super_regex = '("#"[^\\n]*\\n)\x01|(if)\x02|(else)\x03|(while)\x04|(==)\x05|(!=)\x06|(>=)\x07|(<=)\x08|(<)\t|(>)\n|(\\+)\x0b|(\\-)\x0c|(\\*)\r|(/)\x0e|(\\()\x0f|(\\))\x10|(\\[)\x11|(\\])\x12|()\x13|(\\})\x14|(:)\x15|(;)\x16|(=)\x17|(,)\x18|([a-zA-Z_][a-zA-Z0-9_]*)\x19|([0-9]+)\x1a|([ \\t]+)\x1b|(\\n)\x1c|(\\r\\n)\x1d|(\x00)'
 
 from chain_compiler.normalizer import normalize_regex
 from chain_compiler.parser     import parse_tokens

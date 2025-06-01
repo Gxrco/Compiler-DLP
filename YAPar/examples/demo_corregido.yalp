@@ -1,17 +1,18 @@
-/* demo_corregido.yalp */
+/* demo_corregido.yalp - FIXED */
 
-/* 1) Declaración de todos los tokens que el lexer produce */
+/* 1) Declaración de todos los tokens */
 %token IF ELSE WHILE 
-       EQUALS NOTEQUAL GREATEREQ LESSEQ LESS GREATER 
-       PLUS MINUS TIMES DIVIDE 
-       LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE 
-       COLON SEMICOLON ASSIGN COMMA 
-       ID NUMBER
+%token EQUALS NOTEQUAL GREATEREQ LESSEQ LESS GREATER 
+%token PLUS MINUS TIMES DIVIDE 
+%token LPAREN RPAREN LBRACKET RBRACKET LBRACE RBRACE 
+%token COLON SEMICOLON ASSIGN COMMA 
+%token ID NUMBER
 
-/* 2) El parser debe IGNORAR WHITESPACE y COMMENT (tal como los filtra el lexer) */
+/* 2) Ignorar espacios y comentarios */
 IGNORE WHITESPACE COMMENT
 
 %%
+
 program:
     stmt_list
 ;
@@ -19,14 +20,42 @@ program:
 stmt_list:
     stmt_list stmt
   | stmt
+  | /* empty */
 ;
 
 stmt:
+    assignment
+  | block
+  | if_stmt
+  | while_stmt
+;
+
+assignment:
     ID ASSIGN expr SEMICOLON
-  | LBRACE stmt_list RBRACE
-  | IF LPAREN expr RPAREN stmt
-  | IF LPAREN expr RPAREN stmt ELSE stmt
-  | WHILE LPAREN expr RPAREN stmt
+  | ID LBRACKET expr RBRACKET ASSIGN expr SEMICOLON
+;
+
+block:
+    LBRACE stmt_list RBRACE
+;
+
+if_stmt:
+    IF LPAREN cond_expr RPAREN COLON block
+  | IF LPAREN cond_expr RPAREN COLON block ELSE COLON block
+;
+
+while_stmt:
+    WHILE LPAREN cond_expr RPAREN COLON block
+;
+
+cond_expr:
+    expr EQUALS expr
+  | expr NOTEQUAL expr
+  | expr LESS expr
+  | expr GREATER expr
+  | expr LESSEQ expr
+  | expr GREATEREQ expr
+  | expr
 ;
 
 expr:
