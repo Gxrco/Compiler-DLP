@@ -1,21 +1,19 @@
-# parser_yal.py
+# YALex/chain_compiler/tools/yal_parser.py
 
 import re
 
 def escape_string_literals(pat):
     """
-    Sustituye cada "…"-segmento en pat por su contenido escapado
-    (resolviendo \n, \t, etc. antes de hacer re.escape).
-    Ejemplo: '"#"[^\\n]*' → '#[^\\n]*'
+    Sustituye cada "…" segmento en pat por su contenido escapado.
     """
     def repl(m):
         inner = m.group(1)
-        # convierte secuencias \n, \t… en su caracter real
+        # Convierte secuencias \n, \t… en su carácter real
         inner = bytes(inner, 'utf-8').decode('unicode_escape')
-        # escapa todo para regex
+        # Escapa todo para regex
         return re.escape(inner)
-    # captura todo lo que esté entre dobles comillas,
-    # permitiendo \" en medio
+    
+    # Captura todo lo que esté entre dobles comillas
     return re.sub(r'"([^"\\]*(?:\\.[^"\\]*)*)"', repl, pat)
 
 def remove_comments(text):
@@ -24,22 +22,24 @@ def remove_comments(text):
 
 def parse_yal_file(filepath):
     """
-    Parsea un archivo .yal, devolviendo:
-      header      : contenido opcional antes de 'rule'
-      rule        : nombre de la regla
-      alternatives: lista de (pattern, action)
-      trailer     : contenido opcional después de las alternativas
-    Preserva indentación en header/trailer.
+    Parsea un archivo .yal y extrae las reglas de tokens.
+    Retorna un diccionario con:
+      - header: contenido del header
+      - rule: nombre de la regla
+      - alternatives: lista de (pattern, action)
+      - trailer: contenido del trailer
     """
     with open(filepath, encoding='utf-8') as f:
         content = remove_comments(f.read())
+    
     lines = content.splitlines()
-    result = {"header":"", "rule":None, "alternatives":[], "trailer":""}
+    result = {"header": "", "rule": None, "alternatives": [], "trailer": ""}
     i = 0
 
-    # ——— Header ———
-    while i < len(lines) and lines[i].strip()=="":
+    # --- Header ---
+    while i < len(lines) and lines[i].strip() == "":
         i += 1
+    
     if i < len(lines) and lines[i].lstrip().startswith("{"):
         hdr = []
         if "}" in lines[i]:
@@ -58,117 +58,105 @@ def parse_yal_file(filepath):
                 i += 1
         result["header"] = "\n".join(hdr)
 
-    # ——— Regla ———
-    while i < len(lines) and lines[i].strip()=="":
+    # --- Rule ---
+    while i < len(lines) and lines[i].strip() == "":
         i += 1
+    
     if i >= len(lines):
-        raise ValueError("Sin declaración de regla.")
-    m = re.match(r'rule\s+(\w+)\s*=\s*(.*)', lines[i].strip())
+        raise ValueError("No se encontró declaración de regla.")
+    
+    # Buscar la línea que contiene "rule tokens ="
+    rule_line = None
+    while i < len(lines):
+        if "rule tokens" in lines[i]:
+            rule_line = lines[i].strip()
+            break
+        i += 1
+    
+    if not rule_line:
+        raise ValueError("No se encontró 'rule tokens ='")
+    
+    # Extraer el nombre de la regla
+    m = re.match(r'rule\s+(\w+)\s*=\s*(.*)', rule_line)
     if not m:
-        raise ValueError(f"Línea inválida de regla: {lines[i]}")
+        raise ValueError(f"Línea inválida de regla: {rule_line}")
+    
     result["rule"] = m.group(1)
-    alt_text = m.group(2).strip()
     i += 1
 
-    # ——— Leer alternativas ———
-    alts = [alt_text] if alt_text else []
-    while i < len(lines) and not lines[i].lstrip().startswith("{"):
-        if lines[i].strip():
-            alts.append(lines[i].strip())
+    # --- Leer alternativas ---
+    alts = []
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        # Si encontramos un bloque de trailer, salir
+        if line.startswith("{") and "return" not in line:
+            break
+        
+        # Si la línea no está vacía, es una alternativa
+        if line:
+            alts.append(line)
         i += 1
 
-    def split_unescaped(text):
-        parts, cur = [], ""
-        in_class = in_quote = esc = False
-        for ch in text:
-            if esc:
-                cur += ch; esc = False
-            elif ch == "\\":
-                cur += ch; esc = True
-            elif ch == '"' and not in_class:
-                cur += ch; in_quote = not in_quote
-            elif ch == "[" and not in_quote:
-                cur += ch; in_class = True
-            elif ch == "]" and in_class:
-                cur += ch; in_class = False
-            elif ch == "|" and not in_class and not in_quote:
-                parts.append(cur.strip()); cur = ""
-            else:
-                cur += ch
-        if cur:
-            parts.append(cur.strip())
-        return parts
-
-    for alt in split_unescaped(" ".join(alts)):
-        line = alt.lstrip()
-        if line.startswith("|"):
-            line = line[1:].lstrip()
-
-        # buscar '{' real (fuera de comillas y clases)
-        brace = None
-        in_q = in_c = esc = False
-        for j,ch in enumerate(line):
-            if esc:
-                esc = False; continue
-            if ch == "\\":
-                esc = True; continue
-            if ch == '"' and not in_c:
-                in_q = not in_q; continue
-            if ch == "[" and not in_q:
-                in_c = True; continue
-            if ch == "]" and in_c:
-                in_c = False; continue
-            if ch == "{" and not in_q and not in_c:
-                brace = j
-                break
-        if brace is None:
+    # Procesar las alternativas
+    for alt_line in alts:
+        # Quitar el | inicial si existe
+        if alt_line.startswith("|"):
+            alt_line = alt_line[1:].strip()
+        
+        # Buscar el patrón y la acción
+        # El patrón termina donde empieza { return ... }
+        brace_pos = alt_line.find("{")
+        if brace_pos == -1:
             continue
-
-        pat = line[:brace].strip()
-        # desempaquetar literales completos
-        if pat.startswith('"') and pat.endswith('"'):
-            inner = pat[1:-1]
-            inner = bytes(inner, "utf-8").decode("unicode_escape")
-            pat = re.escape(inner)
+        
+        pattern = alt_line[:brace_pos].strip()
+        
+        # Extraer la acción entre { }
+        action_start = brace_pos + 1
+        action_end = alt_line.rfind("}")
+        if action_end == -1:
+            continue
+        
+        action = alt_line[action_start:action_end].strip()
+        
+        # Procesar el patrón
+        # Si es un literal entre comillas, extraerlo y escaparlo
+        if pattern.startswith('"') and pattern.endswith('"'):
+            inner = pattern[1:-1]
+            # Decodificar secuencias de escape
+            try:
+                inner = bytes(inner, "utf-8").decode("unicode_escape")
+            except:
+                pass
+            # Escapar para regex
+            processed_pattern = re.escape(inner)
         else:
-            # reemplazar cualquier fragmento "..." en medio
-            pat = escape_string_literals(pat)
+            # Para otros patrones (como clases de caracteres), dejar tal cual
+            processed_pattern = pattern
+        
+        result["alternatives"].append((processed_pattern, action))
 
-        # extraer acción
-        rest = line[brace:]
-        act = ""
-        depth = 0
-        for ch in rest:
-            if ch == "{":
-                depth += 1
-                continue
-            if ch == "}":
-                depth -= 1
-                if depth == 0:
-                    break
-                act += ch
-            elif depth >= 1:
-                act += ch
-
-        result["alternatives"].append((pat, act.strip()))
-
-    # ——— Trailer ———
-    if i < len(lines) and lines[i].lstrip().startswith("{"):
-        tr = []
-        if "}" in lines[i]:
-            line = lines[i]
-            tr.append(line[line.find("{")+1 : line.find("}")])
-            i += 1
-        else:
-            tr.append(lines[i][lines[i].find("{")+1:])
-            i += 1
-            while i < len(lines) and "}" not in lines[i]:
-                tr.append(lines[i])
-                i += 1
-            if i < len(lines):
+    # --- Trailer ---
+    while i < len(lines):
+        if lines[i].lstrip().startswith("{"):
+            tr = []
+            if "}" in lines[i]:
                 line = lines[i]
-                tr.append(line[:line.find("}")])
+                tr.append(line[line.find("{")+1 : line.find("}")])
                 i += 1
-        result["trailer"] = "\n".join(tr)
+            else:
+                tr.append(lines[i][lines[i].find("{")+1:])
+                i += 1
+                while i < len(lines) and "}" not in lines[i]:
+                    tr.append(lines[i])
+                    i += 1
+                if i < len(lines):
+                    line = lines[i]
+                    tr.append(line[:line.find("}")])
+                    i += 1
+            result["trailer"] = "\n".join(tr)
+            break
+        i += 1
 
     return result
