@@ -5,7 +5,7 @@ import os
 import subprocess
 import importlib.util
 
-def generate_lexer(yal_file, output_file="YALex/thelexer.py"):
+def generate_lexer(yal_file, output_file="thelexer.py"):
     """Generate the lexer using YALex"""
     print(f"\n=== 1) Generando {output_file} desde {yal_file} ===")
     result = subprocess.run(
@@ -51,6 +51,7 @@ def main():
     yalp_file = sys.argv[2]
     input_file = sys.argv[3]
     
+    generate_lexer(yal_file)
     # 2. Generate parser
     generate_parser(yalp_file)
     
