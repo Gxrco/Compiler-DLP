@@ -9,8 +9,8 @@ def clean_regex_part(regex: str) -> str:
     """
     Limpia y escapa correctamente una parte de expresión regular.
     - Convierte saltos reales a '\\n', '\\r', '\\t'.
-    - Deja intactos los character-classes completos.
-    - Deja intactos los literales ya escapados.
+    - Deja intactos los character-classes completos al inicio.
+    - Deja intactos los literales ya escapados (p.ej. '\\+' o '\\-').
     - Escapa el resto de metacaracteres sueltos.
     """
     # 0) Normalizar saltos y tabulaciones
@@ -19,67 +19,70 @@ def clean_regex_part(regex: str) -> str:
                  .replace('\t', r'\t')
     regex = regex.strip()
 
-    # 1) Si es una character-class completa, devolver tal cual
-    if regex.startswith('[') and regex.endswith(']'):
-        return regex
+    # 1) Si empieza con una character-class, la conservamos entera:
+    if regex.startswith('['):
+        close = regex.find(']')
+        if close != -1:
+            cls = regex[:close+1]
+            rest = regex[close+1:]
+            return cls + rest
 
-    # 2) Si ya viene escapada, devolver tal cual
+    # 2) Si ya viene escapada al principio, devolvemos tal cual:
     if regex.startswith('\\'):
         return regex
 
-    # 3) Para literales entre comillas, no escapar
-    if regex.startswith('"') and regex.endswith('"'):
-        # Quitar las comillas y escapar el contenido
-        inner = regex[1:-1]
-        return re.escape(inner)
+    # 3) Para todo lo demás, escapamos los metacaracteres básicos:
+    metachar = r'{}[]().*+?^$|\\'
+    result = ''
+    i = 0
+    while i < len(regex):
+        c = regex[i]
+        if c == '\\' and i+1 < len(regex):
+            # preservamos la pareja de escape completa
+            result += regex[i:i+2]
+            i += 2
+        elif c in metachar:
+            result += '\\' + c
+            i += 1
+        else:
+            result += c
+            i += 1
 
-    # 4) Para todo lo demás, devolver sin modificar
-    # (esto permite que las clases de caracteres funcionen correctamente)
-    return regex
+    return result
 
 def build_super_regex(rules, sentinel: str = DEFAULT_SENTINEL):
     """
-    Construye la super-regex concatenando cada patrón con su marcador
+    Construye la super-regex concatenando cada patrón (con su marcador)
     y, al final, el sentinel como alternativa.
+    Devuelve (super_regex, token_names).
     """
     parts = []
     token_names = []
 
     for idx, (raw_regex, action) in enumerate(rules):
-        pattern = raw_regex.strip()
-        
-        # Limpiar el patrón
+        pattern     = raw_regex.strip()
         regex_clean = clean_regex_part(pattern)
-        
-        # Extraer nombre de token de la acción
+        # colapsar espacios contiguos (solo en la parte textual)
+        regex_clean = re.sub(r'\s+', ' ', regex_clean)
+
+        # extraer nombre de token de la acción:
         m = re.search(r'return\s+([A-Za-z_]\w*)', action)
         if m:
             token = m.group(1)
+        elif 'raise' in action:
+            token = 'EOF' if pattern.lower() == 'eof' else pattern.upper()
         else:
             token = 'UNKNOWN'
         token_names.append(token)
 
-        # Marcador interno único para cada regla
+        # marcador interno (Chr(1), Chr(2), …)
         marker = chr(1 + idx)
-        
-        # Cada alternativa: (patrón)marcador
-        # Importante: no agregar paréntesis extra si ya los tiene
-        if regex_clean.startswith('(') and regex_clean.endswith(')'):
-            parts.append(f"{regex_clean}{marker}")
-        else:
-            parts.append(f"({regex_clean}){marker}")
+        # cada alternativa: (patrón)marcador
+        parts.append(f"({regex_clean}){marker}")
 
-    # Agregar el sentinel al final
+    # por último, la alternativa sentinel (sin marcador, no genera token)
     parts.append(f"({re.escape(sentinel)})")
 
-    # Unir todas las partes con |
     super_regex = "|".join(parts)
-    
-    # Debug: mostrar la super-regex construida
-    print(f"Super-regex construida ({len(parts)} partes):")
-    for i, part in enumerate(parts[:5]):
-        print(f"  Parte {i}: {part}")
-    if len(parts) > 5:
-        print(f"  ... y {len(parts)-5} partes más")
-    
+    print(f"Super-regex construido: {super_regex}")
     return super_regex, token_names
