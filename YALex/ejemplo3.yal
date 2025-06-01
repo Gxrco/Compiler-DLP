@@ -1,4 +1,4 @@
-(* ejemplo3.yal - FIXED *)
+// ejemplo3.yal - FIXED
 
 rule tokens =
 "#"[^\n]*\n           { return COMMENT }

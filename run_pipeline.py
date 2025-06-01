@@ -9,7 +9,7 @@ def generate_lexer(yal_file, output_file="thelexer.py"):
     """Generate the lexer using YALex"""
     print(f"\n=== 1) Generando {output_file} desde {yal_file} ===")
     result = subprocess.run(
-        ["python", "-m", "YALex.app", "--yal", yal_file, "--out", output_file],
+        [sys.executable, "-m", "YALex.app", "--yal", yal_file, "--out", output_file],
         capture_output=True,
         text=True
     )
@@ -23,7 +23,7 @@ def generate_parser(yalp_file, output_file="theparser.py"):
     print(f"\n=== 2) Generando {output_file} desde {yalp_file} ===")
     # Omitir --visualize si causa problemas
     result = subprocess.run(
-        ["python", "-m", "YAPar.cli", yalp_file, "-o", output_file],
+        [sys.executable, "-m", "YAPar.cli", yalp_file, "-o", output_file],
         capture_output=True,
         text=True
     )
@@ -91,9 +91,9 @@ def main():
     token_lexeme_pairs = lexer_module.entrypoint(input_text)
     
     # Debug: mostrar los primeros tokens con sus lexemas
-    print("\nPrimeros tokens generados (token, lexeme):")
-    for i, (tok, lex) in enumerate(token_lexeme_pairs[:10]):
-        print(f"  {i}: {tok:15} '{lex}'")
+    print("\nInspección detallada de tokens:")
+    for i, (tok, lex) in enumerate(token_lexeme_pairs[:15]):
+        print(f"  Token {i}: '{tok}' - Lexema: '{lex}'")
     
     # Extract just the token names
     tokens = [token for token, lexeme in token_lexeme_pairs]
