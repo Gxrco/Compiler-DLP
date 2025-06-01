@@ -4,6 +4,9 @@
 - Gerson Ramírez, 22281
 - Diego Valenzuela, 22309
 
+**Enlace Youtube**
+https://youtu.be/GLfYINajNWE
+
 ## Tabla de Contenidos
 1. [Descripción General](#descripción-general)
 2. [Arquitectura del Proyecto](#arquitectura-del-proyecto)
