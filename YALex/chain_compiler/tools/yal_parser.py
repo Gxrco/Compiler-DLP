@@ -100,25 +100,24 @@ def parse_yal_file(filepath):
 
     # Procesar las alternativas
     for alt_line in alts:
-        # Quitar el | inicial si existe
+        # Quitar el '|' inicial si existe
         if alt_line.startswith("|"):
             alt_line = alt_line[1:].strip()
-        
-        # Buscar el patrón y la acción
-        # El patrón termina donde empieza { return ... }
-        brace_pos = alt_line.find("{")
+
+        # BUSCAR la ÚLTIMA llave '{' para separar patrón de acción:
+        brace_pos = alt_line.rfind("{")
         if brace_pos == -1:
             continue
-        
+
         pattern = alt_line[:brace_pos].strip()
-        
-        # Extraer la acción entre { }
+
+        # Extraer la acción que está entre llaves (como antes):
         action_start = brace_pos + 1
         action_end = alt_line.rfind("}")
         if action_end == -1:
             continue
-        
         action = alt_line[action_start:action_end].strip()
+
         
         # Procesar el patrón
         # Si es un literal entre comillas, extraerlo y escaparlo

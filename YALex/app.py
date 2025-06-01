@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     # 2) Generar thelexer.py
     generate_lexer_py(yal_info, args.out)
-    print(f"✅ Lexer generado en {args.out}")
+    print(f"Lexer generado en {args.out}")
 
     # 3) Si pidieron escaneo, cargar y usar entrypoint
     if args.scan_file:

@@ -2,84 +2,80 @@
 
 import re
 
-# Un sentinel que NUNCA aparecerá en el input real:
+# Marcador que nunca aparece en un programa “real”:
 DEFAULT_SENTINEL = '\x00'
 
-def clean_regex_part(regex: str) -> str:
+def clean_regex_part(raw: str) -> str:
     """
-    Limpia y escapa correctamente una parte de expresión regular.
-    - Convierte saltos reales a '\\n', '\\r', '\\t'.
-    - Deja intactos los character-classes completos.
-    - Deja intactos los literales ya escapados.
-    - Escapa el resto de metacaracteres sueltos.
+    Toma la “raw pattern” que viene desde el .yal y la regresa lista para concatenar:
+      1) Si es exactamente "\"if\"" (literal entre comillas), quita las comillas y escapa el contenido: re.escape(inner).
+      2) Si es "\n", "\r\n" o "\t" *exactamente*, devuelve '\\n', '\\r\\n' o '\\t' (para que el parser de regex los vea como literales).
+      3) Si es una character‐class completa (p.ej. "[a-z]"), la deja tal cual.
+      4) Si empieza con '\\' (p.ej. "\\."), la deja tal cual.
+      5) En cualquier otro caso (p.ej. "<", ">", “>=", etc.), devuelve la cadena sin modificar,
+         para que luego la envolvamos en paréntesis al armar el OR final.
     """
-    # 0) Normalizar saltos y tabulaciones
-    regex = regex.replace('\n', r'\n') \
-                 .replace('\r', r'\r') \
-                 .replace('\t', r'\t')
-    regex = regex.strip()
+    s = raw.strip()
 
-    # 1) Si es una character-class completa, devolver tal cual
-    if regex.startswith('[') and regex.endswith(']'):
-        return regex
-
-    # 2) Si ya viene escapada, devolver tal cual
-    if regex.startswith('\\'):
-        return regex
-
-    # 3) Para literales entre comillas, no escapar
-    if regex.startswith('"') and regex.endswith('"'):
-        # Quitar las comillas y escapar el contenido
-        inner = regex[1:-1]
+    # 1) Si está entre comillas dobles EXACTAS, quito comillas y escapo el interior:
+    if s.startswith('"') and s.endswith('"'):
+        inner = s[1:-1]
+        # p. ej. raw='"if"' → inner="if" → re.escape(inner)="if"
         return re.escape(inner)
 
-    # 4) Para todo lo demás, devolver sin modificar
-    # (esto permite que las clases de caracteres funcionen correctamente)
-    return regex
+    # 2) Si la cadena es textualmente "\n", "\r\n" o "\t" → la devolvemos escapada:
+    if s == r'\n':
+        return r'\n'
+    if s == r'\r\n':
+        return r'\r\n'
+    if s == r'\t':
+        return r'\t'
+
+    # 3) Si es una character‐class completa (empieza con [ y termina con ]), la dejamos intacta:
+    if s.startswith('[') and s.endswith(']'):
+        return s
+
+    # 4) Si ya viene escapada (por ejemplo "\."), la dejamos intacta:
+    if s.startswith('\\'):
+        return s
+
+    # 5) Caso normal (por ej. "<" o ">="), devolvemos sin modificar para luego encerrarla en ().
+    return s
+
+
 
 def build_super_regex(rules, sentinel: str = DEFAULT_SENTINEL):
     """
-    Construye la super-regex concatenando cada patrón con su marcador
-    y, al final, el sentinel como alternativa.
+    Cada elemento de `rules` es (raw_pattern, action_string). Queremos:
+      1) Limpiar raw_pattern con clean_regex_part().
+      2) Extraer nombre de token (p.ej. “IF”, “ID”, etc.) de action_string.
+      3) Construir una lista “parts” donde cada elemento sea "(patrón)⌕" 
+         (⌕ = chr(1 + índice) es el marcador único de esa regla).
+      4) Al final, añadir la rama "(\\x00)" para el sentinel.
+
+    El OR resultante debe *respetar* el orden exacto en que aparecen las líneas
+    dentro de ejemplo3.yal, de arriba hacia abajo.
     """
-    parts = []
+    parts       = []
     token_names = []
 
-    for idx, (raw_regex, action) in enumerate(rules):
-        pattern = raw_regex.strip()
-        
-        # Limpiar el patrón
-        regex_clean = clean_regex_part(pattern)
-        
-        # Extraer nombre de token de la acción
+    for idx, (raw_pattern, action) in enumerate(rules):
+        cleaned = clean_regex_part(raw_pattern)
+
+        #  Extraer “return XXX” de la acción para saber el nombre de token:
         m = re.search(r'return\s+([A-Za-z_]\w*)', action)
-        if m:
-            token = m.group(1)
-        else:
-            token = 'UNKNOWN'
-        token_names.append(token)
+        tok = m.group(1) if m else 'UNKNOWN'
+        token_names.append(tok)
 
-        # Marcador interno único para cada regla
-        marker = chr(1 + idx)
-        
-        # Cada alternativa: (patrón)marcador
-        # Importante: no agregar paréntesis extra si ya los tiene
-        if regex_clean.startswith('(') and regex_clean.endswith(')'):
-            parts.append(f"{regex_clean}{marker}")
-        else:
-            parts.append(f"({regex_clean}){marker}")
+        marker = chr(1 + idx)   # chr(1), chr(2), ... chr(N)
 
-    # Agregar el sentinel al final
+        # Lo envolvemos en paréntesis para que no cambie la precedencia:
+        # Ejemplo: si cleaned = "if", ponemos "(if)\x02".
+        parts.append(f"({cleaned}){marker}")
+
+    # Finalmente, agrego la alternativa que solo es el sentinel:
     parts.append(f"({re.escape(sentinel)})")
 
-    # Unir todas las partes con |
+    # Uno todo con '|' en el mismo orden en que estoy recorriendo `rules`.
     super_regex = "|".join(parts)
-    
-    # Debug: mostrar la super-regex construida
-    print(f"Super-regex construida ({len(parts)} partes):")
-    for i, part in enumerate(parts[:5]):
-        print(f"  Parte {i}: {part}")
-    if len(parts) > 5:
-        print(f"  ... y {len(parts)-5} partes más")
-    
     return super_regex, token_names
